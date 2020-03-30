@@ -125,7 +125,6 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 		if (!array_mesh.is_null()) {
 			bool has_blends = false;
 			bool has_bones = false;
-			bool has_transparency = false;
 			bool has_emission = false;
 			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 				Array array = array_mesh->surface_get_arrays(surface_i);
@@ -139,15 +138,12 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 				Ref<SpatialMaterial> spatial_mat = array_mesh->surface_get_material(surface_i);
 				if (spatial_mat.is_valid()) {
 					Ref<Image> img = spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
-					if (spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) || spatial_mat->get_albedo().a != 1.0f) {
-						has_transparency |= true;
-					}
 					if (spatial_mat->get_feature(SpatialMaterial::FEATURE_EMISSION)) {
 						has_emission |= true;
 					}
 				}
 			}
-			if (!has_blends && !has_bones && !has_transparency && !has_emission) {
+			if (!has_blends && !has_bones && !has_emission) {
 				r_items.push_back(mi);
 			}
 		}
@@ -197,7 +193,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 	_generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, vertex_to_material, material_cache, pack_options);
 	atlas_lookup.resize(atlas->width * atlas->height);
 	Map<String, Ref<Image> > texture_atlas;
-	MergeState state = { p_root, atlas, mesh_items, vertex_to_material, uv_groups, model_vertices, p_root->get_name(), pack_options, atlas_lookup, material_cache, texture_atlas };
+	MergeState state = { p_root, atlas, mesh_items, vertex_to_material, uv_groups, model_vertices, p_root->get_name(), pack_options, atlas_lookup, material_cache, texture_atlas, false};
 
 	print_line("Generating albedo texture atlas.");
 	_generate_texture_atlas(state, "albedo");
@@ -377,13 +373,16 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Map<u
 			}
 		} else if (texture_type == "albedo") {
 			tex = material->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
+			if (material->get_feature(SpatialMaterial::FEATURE_TRANSPARENT)) {
+				state.is_transparent = true;
+			}
 			Color color_mul;
 			Color color_add;
 			if (tex.is_valid()) {
 				color_mul = material->get_albedo();
-				color_add = Color(0, 0, 0);
+				color_add = Color(0, 0, 0, 0);
 			} else {
-				color_mul = Color(1, 1, 1);
+				color_mul = Color(1, 1, 1, 1);
 				color_add = material->get_albedo();
 			}
 			if (tex.is_valid()) {
@@ -651,7 +650,7 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 			pixel.r = pixels[index + 0] / 255.0;
 			pixel.g = pixels[index + 1] / 255.0;
 			pixel.b = pixels[index + 2] / 255.0;
-			pixel.a = 1.0f;
+			pixel.a = pixels[index + 3] / 255.0;
 			target_image->set_pixel(x, y, pixel);
 		}
 	}
@@ -737,6 +736,10 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			Ref<Image> img = dilate(A->get());
 			texture->create_from_image(img);
 			texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			if (state.is_transparent) {
+				mat->set_feature(SpatialMaterial::FEATURE_TRANSPARENT, true);
+				mat->set_depth_draw_mode(SpatialMaterial::DEPTH_DRAW_ALPHA_OPAQUE_PREPASS);
+			}
 			mat->set_texture(SpatialMaterial::TEXTURE_ALBEDO, texture);
 		}
 		Map<String, Ref<Image> >::Element *E = state.texture_atlas.find("emission");
