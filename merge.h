@@ -436,14 +436,16 @@ private:
 		Vector<AtlasLookupTexel> &atlas_lookup;
 		Vector<Ref<Material> > &material_cache;
 		Map<String, Ref<Image> > texture_atlas;
-		bool is_transparent;
 	};
 	Ref<Image> dilate(Ref<Image> source_image);
 
 public:
 	Node *merge(Node *p_root, Node *p_original_root);
+
 	void _generate_texture_atlas(MergeState &state, String texture_type);
+
 	Ref<Image> _get_source_texture(MergeState &state, Map<uint16_t, Ref<Image> > &image_cache, const xatlas::Chart &chart, Ref<SpatialMaterial> &material, String texture_type);
+
 	void _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshInstance *> &r_meshes, Array vertex_to_material, const Vector<Ref<Material> > material_cache,
 			xatlas::PackOptions &pack_options);
 	void scale_uvs_by_texture_dimension(const Vector<MeshInstance *> &original_mesh_items, Vector<MeshInstance *> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
