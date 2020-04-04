@@ -492,10 +492,6 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshIn
 			Vector<int32_t> index_arr = mesh[Mesh::ARRAY_INDEX];
 			Vector<Plane> tangent_arr = mesh[Mesh::ARRAY_TANGENT];
 			Transform xform = original_mesh_items[mesh_i]->get_global_transform();
-			Spatial *spatial_root = Object::cast_to<Spatial>(original_mesh_items[mesh_i]->get_owner());
-			if (spatial_root) {
-				xform = xform * spatial_root->get_transform().affine_inverse();
-			}
 			Vector<ModelVertex> model_vertices;
 			model_vertices.resize(vertex_arr.size());
 			for (int32_t vertex_i = 0; vertex_i < vertex_arr.size(); vertex_i++) {
@@ -661,7 +657,12 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			st->add_index(index);
 		}
 		Ref<ArrayMesh> array_mesh = st->commit();
-		st_all->append_from(array_mesh, 0, Transform());
+		Transform root_xform;
+		Spatial *spatial = Object::cast_to<Spatial>(state.p_root);
+		if (spatial) {
+			root_xform = spatial->get_transform();
+		}
+		st_all->append_from(array_mesh, 0, root_xform.affine_inverse());
 	}
 	Ref<SpatialMaterial> mat;
 	mat.instance();
