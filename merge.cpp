@@ -657,12 +657,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			st->add_index(index);
 		}
 		Ref<ArrayMesh> array_mesh = st->commit();
-		Transform root_xform;
-		Spatial *spatial = Object::cast_to<Spatial>(state.p_root);
-		if (spatial) {
-			root_xform = spatial->get_transform();
-		}
-		st_all->append_from(array_mesh, 0, root_xform.affine_inverse());
+		st_all->append_from(array_mesh, 0, Transform());
 	}
 	Ref<SpatialMaterial> mat;
 	mat.instance();
@@ -722,6 +717,12 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 	Ref<ArrayMesh> array_mesh = st_all->commit();
 	mi->set_mesh(array_mesh);
 	mi->set_name(state.p_name + "Merged");
+	Transform root_xform;
+	Spatial *spatial = Object::cast_to<Spatial>(state.p_root);
+	if (spatial) {
+		root_xform = spatial->get_transform();
+	}
+	mi->set_transform(root_xform.affine_inverse());
 	print_line("Merged scene.");
 	array_mesh->surface_set_material(0, mat);
 	state.p_root->add_child(mi);
