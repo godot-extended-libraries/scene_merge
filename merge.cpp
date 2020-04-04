@@ -320,15 +320,8 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Map<u
 						}
 						ao_img->unlock();
 					}
-					float channel_mul;
-					float channel_add;
-					if (roughness_img.is_valid()) {
-						channel_mul = material->get_roughness();
-						channel_add = 0.0f;
-					} else {
-						channel_mul = 1.0f;
-						channel_add = material->get_roughness();
-					}
+					float channel_mul = 0.0f;
+					float channel_add = 0.0f;
 					if (roughness_img.is_valid() && !roughness_img->empty()) {
 						roughness_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 						roughness_img->lock();
@@ -345,14 +338,14 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Map<u
 						}
 						roughness_img->unlock();
 					}
-					orm.g = orm.g * channel_mul + channel_add;
-					if (metallic_img.is_valid()) {
-						channel_mul = material->get_metallic();
+					if (roughness_img.is_valid()) {
+						channel_mul = material->get_roughness();
 						channel_add = 0.0f;
 					} else {
-						channel_mul = 1.0f;
-						channel_add = material->get_metallic();
+						channel_mul = 0.0f;
+						channel_add = material->get_roughness();
 					}
+					orm.g = (orm.g * channel_mul) + channel_add;
 					if (metallic_img.is_valid() && !metallic_img->empty()) {
 						metallic_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 						metallic_img->lock();
@@ -370,7 +363,14 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Map<u
 						}
 						metallic_img->unlock();
 					}
-					orm.b = orm.b * channel_mul + channel_add;
+					if (metallic_img.is_valid()) {
+						channel_mul = material->get_metallic();
+						channel_add = 0.0f;
+					} else {
+						channel_mul = 0.0f;
+						channel_add = material->get_metallic();
+					}
+					orm.b = (orm.b * channel_mul) + channel_add;
 					img->lock();
 					img->set_pixel(x, y, orm);
 					img->unlock();
