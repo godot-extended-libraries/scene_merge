@@ -712,9 +712,9 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			const xatlas::Vertex vertex = mesh.vertexArray[v];
 			const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
 			st->add_uv(Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height));
-			Vector3 normal = sourceVertex.normal.normalized();
-			st->add_normal(normal);
+			st->add_normal(sourceVertex.normal);
 			st->add_tangent(sourceVertex.tangent);
+			st->add_color(sourceVertex.color);
 			st->add_vertex(sourceVertex.pos);
 		}
 
@@ -781,9 +781,11 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			mat->set_ao_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_RED);
 			mat->set_feature(SpatialMaterial::FEATURE_AMBIENT_OCCLUSION, true);
 			mat->set_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION, texture);
+			mat->set_roughness(1.0f);
 			mat->set_roughness_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_GREEN);
 			mat->set_texture(SpatialMaterial::TEXTURE_ROUGHNESS, texture);
 			mat->set_metallic_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_BLUE);
+			mat->set_metallic(1.0);
 			mat->set_texture(SpatialMaterial::TEXTURE_METALLIC, texture);
 		}
 	}
