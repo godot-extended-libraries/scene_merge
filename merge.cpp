@@ -122,7 +122,7 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 	MeshInstance *mi = Object::cast_to<MeshInstance>(p_current_node);
 	if (mi) {
 		Ref<ArrayMesh> array_mesh = mi->get_mesh();
-		if (!array_mesh.is_null()) {
+		if (array_mesh.is_valid()) {
 			bool has_blends = false;
 			bool has_bones = false;
 			bool has_transparency = false;
@@ -130,21 +130,12 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 				Array array = array_mesh->surface_get_arrays(surface_i);
 				Array bones = array[ArrayMesh::ARRAY_BONES];
-				if (bones.size()) {
-					has_bones |= true;
-				}
-				if (array_mesh->get_blend_shape_count()) {
-					has_blends |= true;
-				}
+				has_bones |= bones.size() != 0;
+				has_blends |= array_mesh->get_blend_shape_count() != 0;
 				Ref<SpatialMaterial> spatial_mat = array_mesh->surface_get_material(surface_i);
 				if (spatial_mat.is_valid()) {
-					Ref<Image> img = spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
-					if (spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) || spatial_mat->get_albedo().a != 1.0f) {
-						has_transparency |= true;
-					}
-					if (spatial_mat->get_feature(SpatialMaterial::FEATURE_EMISSION)) {
-						has_emission |= true;
-					}
+					has_transparency |= spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) && (spatial_mat->get_albedo().a != 1.0f || spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO)->has_alpha());
+					has_emission |= spatial_mat->get_feature(SpatialMaterial::FEATURE_EMISSION) && ( spatial_mat->get_emission() != Color() || spatial_mat->get_texture(SpatialMaterial::TEXTURE_EMISSION).is_valid()) && spatial_mat->get_emission_energy() != 1.0f;
 				}
 			}
 			if (!has_blends && !has_bones && !has_transparency && !has_emission) {
