@@ -135,7 +135,7 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 				Ref<SpatialMaterial> spatial_mat = array_mesh->surface_get_material(surface_i);
 				if (spatial_mat.is_valid()) {
 					has_transparency |= spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) && (spatial_mat->get_albedo().a != 1.0f || spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO)->has_alpha());
-					has_emission |= spatial_mat->get_feature(SpatialMaterial::FEATURE_EMISSION) && ( spatial_mat->get_emission() != Color() || spatial_mat->get_texture(SpatialMaterial::TEXTURE_EMISSION).is_valid()) && spatial_mat->get_emission_energy() != 1.0f;
+					has_emission |= spatial_mat->get_feature(SpatialMaterial::FEATURE_EMISSION) && (spatial_mat->get_emission() != Color() || spatial_mat->get_texture(SpatialMaterial::TEXTURE_EMISSION).is_valid()) && spatial_mat->get_emission_energy() != 1.0f;
 				}
 			}
 			if (!has_blends && !has_bones && !has_transparency && !has_emission) {
