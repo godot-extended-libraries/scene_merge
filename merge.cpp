@@ -340,12 +340,10 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Map<u
 					}
 					if (roughness_img.is_valid()) {
 						channel_mul = material->get_roughness();
-						channel_add = 0.0f;
+						orm.g = orm.g * channel_mul;
 					} else {
-						channel_mul = 0.0f;
-						channel_add = material->get_roughness();
+						orm.g = material->get_roughness();
 					}
-					orm.g = (orm.g * channel_mul) + channel_add;
 					if (metallic_img.is_valid() && !metallic_img->empty()) {
 						metallic_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 						metallic_img->lock();
@@ -365,12 +363,10 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Map<u
 					}
 					if (metallic_img.is_valid()) {
 						channel_mul = material->get_metallic();
-						channel_add = 0.0f;
+						orm.b = orm.b * channel_mul;
 					} else {
-						channel_mul = 0.0f;
-						channel_add = material->get_metallic();
+						orm.b = 1.0;
 					}
-					orm.b = (orm.b * channel_mul) + channel_add;
 					img->lock();
 					img->set_pixel(x, y, orm);
 					img->unlock();
@@ -774,7 +770,6 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			mat->set_ao_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_RED);
 			mat->set_feature(SpatialMaterial::FEATURE_AMBIENT_OCCLUSION, true);
 			mat->set_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION, texture);
-			mat->set_roughness(1.0f);
 			mat->set_roughness_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_GREEN);
 			mat->set_texture(SpatialMaterial::TEXTURE_ROUGHNESS, texture);
 			mat->set_metallic_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_BLUE);
