@@ -715,7 +715,6 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			Vector3 normal = sourceVertex.normal.normalized();
 			st->add_normal(normal);
 			st->add_tangent(sourceVertex.tangent);
-			st->add_color(sourceVertex.color);
 			st->add_vertex(sourceVertex.pos);
 		}
 
