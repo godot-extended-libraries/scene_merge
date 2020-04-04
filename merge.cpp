@@ -661,7 +661,12 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			st->add_index(index);
 		}
 		Ref<ArrayMesh> array_mesh = st->commit();
-		st_all->append_from(array_mesh, 0, Transform());
+		Transform root_xform;
+		Spatial *spatial = Object::cast_to<Spatial>(state.p_root);
+		if (spatial) {
+			root_xform = spatial->get_transform();
+		}
+		st_all->append_from(array_mesh, 0, root_xform.affine_inverse());
 	}
 	Ref<SpatialMaterial> mat;
 	mat.instance();
