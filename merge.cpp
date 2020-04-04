@@ -300,6 +300,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Map<u
 	} else {
 		Ref<Texture> tex;
 		if (texture_type == "orm") {
+			img->create(width, height, false, Image::FORMAT_RGB8);
 			for (int32_t y = 0; y < img->get_height(); y++) {
 				for (int32_t x = 0; x < img->get_width(); x++) {
 					Color orm;
@@ -530,9 +531,9 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshIn
 	}
 	uint32_t mesh_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		for (int32_t j = 0; j < mesh_items[mesh_i]->get_mesh()->get_surface_count(); j++) {
+		for (int32_t surface_i = 0; surface_i < mesh_items[mesh_i]->get_mesh()->get_surface_count(); surface_i++) {
 
-			Array mesh = mesh_items[mesh_i]->get_mesh()->surface_get_arrays(j);
+			Array mesh = mesh_items[mesh_i]->get_mesh()->surface_get_arrays(surface_i);
 			if (mesh.empty()) {
 				continue;
 			}
@@ -711,12 +712,11 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			const xatlas::Vertex vertex = mesh.vertexArray[v];
 			const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
 			st->add_uv(Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height));
-			Vector3 normal = sourceVertex.normal;
+			Vector3 normal = sourceVertex.normal.normalized();
 			st->add_normal(normal);
-			st->add_smooth_group(true);
-			st->add_color(sourceVertex.color);
 			st->add_tangent(sourceVertex.tangent);
-			st->add_vertex(Vector3(sourceVertex.pos.x, sourceVertex.pos.y, sourceVertex.pos.z));
+			st->add_color(sourceVertex.color);
+			st->add_vertex(sourceVertex.pos);
 		}
 
 		for (uint32_t f = 0; f < mesh.indexCount; f++) {
@@ -783,10 +783,8 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			mat->set_feature(SpatialMaterial::FEATURE_AMBIENT_OCCLUSION, true);
 			mat->set_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION, texture);
 			mat->set_roughness_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_GREEN);
-			mat->set_roughness(1.0f);
 			mat->set_texture(SpatialMaterial::TEXTURE_ROUGHNESS, texture);
 			mat->set_metallic_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_BLUE);
-			mat->set_metallic(1.0f);
 			mat->set_texture(SpatialMaterial::TEXTURE_METALLIC, texture);
 		}
 	}
