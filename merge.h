@@ -419,7 +419,6 @@ private:
 		Vector3 pos;
 		Vector3 normal;
 		Vector2 uv;
-		Color color;
 	};
 
 	void _find_all_mesh_instances(Vector<MeshInstance *> &r_items, Node *p_current_node, const Node *p_owner);

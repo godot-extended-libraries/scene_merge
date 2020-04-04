@@ -532,8 +532,8 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshIn
 	uint32_t mesh_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		for (int32_t surface_i = 0; surface_i < mesh_items[mesh_i]->get_mesh()->get_surface_count(); surface_i++) {
-
-			Array mesh = mesh_items[mesh_i]->get_mesh()->surface_get_arrays(surface_i);
+			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i]->get_mesh();
+			Array mesh = array_mesh->surface_get_arrays(surface_i);
 			if (mesh.empty()) {
 				continue;
 			}
@@ -544,7 +544,6 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshIn
 			Vector<Vector3> vertex_arr = mesh[Mesh::ARRAY_VERTEX];
 			Vector<Vector3> normal_arr = mesh[Mesh::ARRAY_NORMAL];
 			Vector<Vector2> uv_arr = mesh[Mesh::ARRAY_TEX_UV];
-			Vector<Color> color_arr = mesh[Mesh::ARRAY_COLOR];
 			Vector<int32_t> index_arr = mesh[Mesh::ARRAY_INDEX];
 			Vector<Plane> tangent_arr = mesh[Mesh::ARRAY_TANGENT];
 			Transform xform = original_mesh_items[mesh_i]->get_global_transform();
@@ -563,9 +562,6 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshIn
 				}
 				if (uv_arr.size()) {
 					vertex.uv = uv_arr[vertex_i];
-				}
-				if (color_arr.size()) {
-					vertex.color = color_arr[vertex_i];
 				}
 				model_vertices.write[vertex_i] = vertex;
 			}
@@ -711,7 +707,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
 			st->add_uv(Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height));
 			st->add_normal(sourceVertex.normal);
-			st->add_color(sourceVertex.color);
+			st->add_color(Color(1.0f, 1.0f, 1.0f));
 			st->add_vertex(sourceVertex.pos);
 		}
 		st->generate_tangents();
