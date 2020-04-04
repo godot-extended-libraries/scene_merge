@@ -558,16 +558,14 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshIn
 				ModelVertex vertex;
 				vertex.pos = xform.xform(vertex_arr[vertex_i]);
 				if (normal_arr.size()) {
-					vertex.normal = normal_arr[vertex_i];
+					Vector3 normal = normal_arr[vertex_i];
+					vertex.normal = xform.basis.xform(normal).normalized();
 				}
 				if (uv_arr.size()) {
 					vertex.uv = uv_arr[vertex_i];
 				}
 				if (color_arr.size()) {
 					vertex.color = color_arr[vertex_i];
-				}
-				if (tangent_arr.size()) {
-					vertex.tangent = tangent_arr[vertex_i];
 				}
 				model_vertices.write[vertex_i] = vertex;
 			}
@@ -713,11 +711,10 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
 			st->add_uv(Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height));
 			st->add_normal(sourceVertex.normal);
-			st->add_tangent(sourceVertex.tangent);
 			st->add_color(sourceVertex.color);
 			st->add_vertex(sourceVertex.pos);
 		}
-
+		st->generate_tangents();
 		for (uint32_t f = 0; f < mesh.indexCount; f++) {
 			const uint32_t index = mesh.indexArray[f];
 			st->add_index(index);
