@@ -698,7 +698,6 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			st->add_color(Color(1.0f, 1.0f, 1.0f));
 			st->add_vertex(sourceVertex.pos);
 		}
-		st->generate_tangents();
 		for (uint32_t f = 0; f < mesh.indexCount; f++) {
 			const uint32_t index = mesh.indexArray[f];
 			st->add_index(index);
