@@ -702,6 +702,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			const uint32_t index = mesh.indexArray[f];
 			st->add_index(index);
 		}
+		st->generate_tangents();
 		Ref<ArrayMesh> array_mesh = st->commit();
 		st_all->append_from(array_mesh, 0, Transform());
 	}
@@ -759,7 +760,6 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 		}
 	}
 	MeshInstance *mi = memnew(MeshInstance);
-	st_all->generate_tangents();
 	Ref<ArrayMesh> array_mesh = st_all->commit();
 	mi->set_mesh(array_mesh);
 	mi->set_name(state.p_name + "Merged");
