@@ -209,14 +209,13 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	atlas_img.instance();
 	atlas_img->create(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
 	// Rasterize chart triangles.
-	Map<uint16_t, Ref<Image> > image_cache;
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
 		print_line("  mesh atlas " + itos(mesh_i));
 		for (uint32_t j = 0; j < mesh.chartCount; j++) {
 			const xatlas::Chart &chart = mesh.chartArray[j];
-			Ref<SpatialMaterial> material;
-			Ref<Image> img = _get_source_texture(state, image_cache, chart, material, texture_type);
+			Ref<SpatialMaterial> material = state.material_cache.get(chart.material);
+			Ref<Image> img = _get_source_texture(state, material, texture_type);
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
 			Ref<ImageTexture> image_texture;
 			image_texture.instance();
@@ -245,12 +244,10 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	state.texture_atlas.insert(texture_type, atlas_img);
 }
 
-Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Map<uint16_t, Ref<Image> > &image_cache, const xatlas::Chart &chart, Ref<SpatialMaterial> &material, String texture_type) {
-	Ref<Image> img;
+Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const Ref<SpatialMaterial> material, String texture_type) {
+	ERR_FAIL_COND_V(material.is_null(), nullptr);
 	float width = 1;
 	float height = 1;
-	material = state.material_cache.get(chart.material);
-	ERR_FAIL_COND_V(material.is_null(), nullptr);
 	Ref<Image> ao_img = material->get_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION);
 	Ref<Image> metallic_img = material->get_texture(SpatialMaterial::TEXTURE_METALLIC);
 	Ref<Image> roughness_img = material->get_texture(SpatialMaterial::TEXTURE_ROUGHNESS);
@@ -276,132 +273,127 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Map<u
 		width = MAX(width, normal_img->get_width());
 		height = MAX(height, normal_img->get_height());
 	}
+	Ref<Image> img;
 	img.instance();
 	img->create(width, height, false, Image::FORMAT_RGBA8);
-	Map<uint16_t, Ref<Image> >::Element *E = image_cache.find(chart.material);
-	if (E) {
-		img = E->get();
-	} else {
-		Ref<Texture> tex;
-		if (texture_type == "orm") {
-			img->create(width, height, false, Image::FORMAT_RGB8);
-			for (int32_t y = 0; y < img->get_height(); y++) {
-				for (int32_t x = 0; x < img->get_width(); x++) {
-					Color orm;
-					if (ao_img.is_valid() && !ao_img->empty()) {
-						ao_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
-						ao_img->lock();
-						if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_RED) {
-							orm.r = ao_img->get_pixel(x, y).r;
-						} else if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GREEN) {
-							orm.r = ao_img->get_pixel(x, y).g;
-						} else if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_BLUE) {
-							orm.r = ao_img->get_pixel(x, y).b;
-						} else if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_ALPHA) {
-							orm.r = ao_img->get_pixel(x, y).a;
-						} else if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GRAYSCALE) {
-							orm.r = ao_img->get_pixel(x, y).r;
-						}
-						ao_img->unlock();
+	Ref<Texture> tex;
+	if (texture_type == "orm") {
+		img->create(width, height, false, Image::FORMAT_RGB8);
+		for (int32_t y = 0; y < img->get_height(); y++) {
+			for (int32_t x = 0; x < img->get_width(); x++) {
+				Color orm;
+				if (ao_img.is_valid() && !ao_img->empty()) {
+					ao_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
+					ao_img->lock();
+					if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_RED) {
+						orm.r = ao_img->get_pixel(x, y).r;
+					} else if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GREEN) {
+						orm.r = ao_img->get_pixel(x, y).g;
+					} else if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_BLUE) {
+						orm.r = ao_img->get_pixel(x, y).b;
+					} else if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_ALPHA) {
+						orm.r = ao_img->get_pixel(x, y).a;
+					} else if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GRAYSCALE) {
+						orm.r = ao_img->get_pixel(x, y).r;
 					}
-					float channel_mul = 0.0f;
-					float channel_add = 0.0f;
-					if (roughness_img.is_valid() && !roughness_img->empty()) {
-						roughness_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
-						roughness_img->lock();
-						if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_RED) {
-							orm.g = roughness_img->get_pixel(x, y).r;
-						} else if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GREEN) {
-							orm.g = roughness_img->get_pixel(x, y).g;
-						} else if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_BLUE) {
-							orm.g = roughness_img->get_pixel(x, y).b;
-						} else if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_ALPHA) {
-							orm.g = roughness_img->get_pixel(x, y).a;
-						} else if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GRAYSCALE) {
-							orm.g = roughness_img->get_pixel(x, y).r;
-						}
-						roughness_img->unlock();
+					ao_img->unlock();
+				}
+				float channel_mul = 0.0f;
+				float channel_add = 0.0f;
+				if (roughness_img.is_valid() && !roughness_img->empty()) {
+					roughness_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
+					roughness_img->lock();
+					if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_RED) {
+						orm.g = roughness_img->get_pixel(x, y).r;
+					} else if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GREEN) {
+						orm.g = roughness_img->get_pixel(x, y).g;
+					} else if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_BLUE) {
+						orm.g = roughness_img->get_pixel(x, y).b;
+					} else if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_ALPHA) {
+						orm.g = roughness_img->get_pixel(x, y).a;
+					} else if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GRAYSCALE) {
+						orm.g = roughness_img->get_pixel(x, y).r;
 					}
-					if (roughness_img.is_valid()) {
-						channel_mul = material->get_roughness();
-						orm.g = orm.g * channel_mul;
-					} else {
-						orm.g = material->get_roughness();
-					}
-					if (metallic_img.is_valid() && !metallic_img->empty()) {
-						metallic_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
-						metallic_img->lock();
+					roughness_img->unlock();
+				}
+				if (roughness_img.is_valid()) {
+					channel_mul = material->get_roughness();
+					orm.g = orm.g * channel_mul;
+				} else {
+					orm.g = material->get_roughness();
+				}
+				if (metallic_img.is_valid() && !metallic_img->empty()) {
+					metallic_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
+					metallic_img->lock();
 
-						if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_RED) {
-							orm.b = metallic_img->get_pixel(x, y).r;
-						} else if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GREEN) {
-							orm.b = metallic_img->get_pixel(x, y).g;
-						} else if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_BLUE) {
-							orm.b = metallic_img->get_pixel(x, y).b;
-						} else if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_ALPHA) {
-							orm.b = metallic_img->get_pixel(x, y).a;
-						} else if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GRAYSCALE) {
-							orm.b = metallic_img->get_pixel(x, y).r;
-						}
-						metallic_img->unlock();
+					if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_RED) {
+						orm.b = metallic_img->get_pixel(x, y).r;
+					} else if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GREEN) {
+						orm.b = metallic_img->get_pixel(x, y).g;
+					} else if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_BLUE) {
+						orm.b = metallic_img->get_pixel(x, y).b;
+					} else if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_ALPHA) {
+						orm.b = metallic_img->get_pixel(x, y).a;
+					} else if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GRAYSCALE) {
+						orm.b = metallic_img->get_pixel(x, y).r;
 					}
-					if (metallic_img.is_valid()) {
-						channel_mul = material->get_metallic();
-						orm.b = orm.b * channel_mul;
-					} else {
-						orm.b = 1.0;
-					}
-					img->lock();
-					img->set_pixel(x, y, orm);
-					img->unlock();
+					metallic_img->unlock();
+				}
+				if (metallic_img.is_valid()) {
+					channel_mul = material->get_metallic();
+					orm.b = orm.b * channel_mul;
+				} else {
+					orm.b = 1.0;
+				}
+				img->lock();
+				img->set_pixel(x, y, orm);
+				img->unlock();
+			}
+		}
+	} else if (texture_type == "albedo") {
+		tex = material->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
+		Color color_mul;
+		Color color_add;
+		if (tex.is_valid()) {
+			color_mul = material->get_albedo();
+			color_add = Color(0, 0, 0);
+		} else {
+			color_mul = Color(1, 1, 1);
+			color_add = material->get_albedo();
+		}
+		if (tex.is_valid()) {
+			img = tex->get_data();
+			if (!img->empty()) {
+				if (img->is_compressed()) {
+					img->decompress();
 				}
 			}
-		} else if (texture_type == "albedo") {
-			tex = material->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
-			Color color_mul;
-			Color color_add;
-			if (tex.is_valid()) {
-				color_mul = material->get_albedo();
-				color_add = Color(0, 0, 0);
-			} else {
-				color_mul = Color(1, 1, 1);
-				color_add = material->get_albedo();
+		}
+		img->lock();
+		for (int32_t y = 0; y < img->get_height(); y++) {
+			for (int32_t x = 0; x < img->get_width(); x++) {
+				Color c = img->get_pixel(x, y);
+				c.r = c.r * color_mul.r + color_add.r;
+				c.g = c.g * color_mul.g + color_add.g;
+				c.b = c.b * color_mul.b + color_add.b;
+				img->set_pixel(x, y, c);
 			}
-			if (tex.is_valid()) {
-				img = tex->get_data();
-				if (!img->empty()) {
-					if (img->is_compressed()) {
-						img->decompress();
-					}
-				}
-			}
-			img->lock();
-			for (int32_t y = 0; y < img->get_height(); y++) {
-				for (int32_t x = 0; x < img->get_width(); x++) {
-					Color c = img->get_pixel(x, y);
-					c.r = c.r * color_mul.r + color_add.r;
-					c.g = c.g * color_mul.g + color_add.g;
-					c.b = c.b * color_mul.b + color_add.b;
-					img->set_pixel(x, y, c);
-				}
-			}
-			img->unlock();
-		} else if (texture_type == "normal") {
-			if (!material->get_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING)) {
-				return img;
-			}
-			tex = material->get_texture(SpatialMaterial::TEXTURE_NORMAL);
-			if (tex.is_valid()) {
-				img = tex->get_data();
-				if (!img->empty()) {
-					if (img->is_compressed()) {
-						img->decompress();
-					}
+		}
+		img->unlock();
+	} else if (texture_type == "normal") {
+		if (!material->get_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING)) {
+			return img;
+		}
+		tex = material->get_texture(SpatialMaterial::TEXTURE_NORMAL);
+		if (tex.is_valid()) {
+			img = tex->get_data();
+			if (!img->empty()) {
+				if (img->is_compressed()) {
+					img->decompress();
 				}
 			}
 		}
 	}
-	image_cache.insert(chart.material, img);
 	return img;
 }
 
