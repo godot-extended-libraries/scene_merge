@@ -212,8 +212,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
 		print_line("  mesh atlas " + itos(mesh_i));
-		for (uint32_t j = 0; j < mesh.chartCount; j++) {
-			const xatlas::Chart &chart = mesh.chartArray[j];
+		for (uint32_t chart_i = 0; chart_i < mesh.chartCount; chart_i++) {
+			const xatlas::Chart &chart = mesh.chartArray[chart_i];
 			Ref<SpatialMaterial> material = state.material_cache.get(chart.material);
 			Ref<Image> img = _get_source_texture(state, material, texture_type);
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
@@ -248,11 +248,31 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 	ERR_FAIL_COND_V(material.is_null(), nullptr);
 	float width = 1;
 	float height = 1;
-	Ref<Image> ao_img = material->get_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION);
-	Ref<Image> metallic_img = material->get_texture(SpatialMaterial::TEXTURE_METALLIC);
-	Ref<Image> roughness_img = material->get_texture(SpatialMaterial::TEXTURE_ROUGHNESS);
-	Ref<Image> albedo_img = material->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
-	Ref<Image> normal_img = material->get_texture(SpatialMaterial::TEXTURE_NORMAL);
+	Ref<Texture> ao_texture = material->get_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION);
+	Ref<Image> ao_img;
+	if (ao_texture.is_valid()) {
+		ao_img = ao_texture->get_data();
+	}
+	Ref<Texture> metallic_texture = material->get_texture(SpatialMaterial::TEXTURE_METALLIC);
+	Ref<Image> metallic_img;
+	if (metallic_texture.is_valid()) {
+		metallic_img = metallic_texture->get_data();
+	}
+	Ref<Texture> roughness_texture = material->get_texture(SpatialMaterial::TEXTURE_ROUGHNESS);
+	Ref<Image> roughness_img;
+	if (roughness_texture.is_valid()) {
+		roughness_img = roughness_texture->get_data();
+	}
+	Ref<Texture> albedo_texture = material->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
+	Ref<Image> albedo_img;
+	if (albedo_texture.is_valid()) {
+		roughness_img = albedo_texture->get_data();
+	}
+	Ref<Texture> normal_texture = material->get_texture(SpatialMaterial::TEXTURE_NORMAL);
+	Ref<Image> normal_img;
+	if (normal_texture.is_valid()) {
+		normal_img = normal_texture->get_data();
+	}
 	if (ao_img.is_valid() && !ao_img->empty()) {
 		width = MAX(width, ao_img->get_width());
 		height = MAX(height, ao_img->get_height());
@@ -273,6 +293,30 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		width = MAX(width, normal_img->get_width());
 		height = MAX(height, normal_img->get_height());
 	}
+	if (ao_img.is_valid()) {
+		if (!ao_img->empty()) {
+			if (ao_img->is_compressed()) {
+				ao_img->decompress();
+			}
+		}
+		ao_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
+	}
+	if (roughness_img.is_valid()) {
+		if (!roughness_img->empty()) {
+			if (roughness_img->is_compressed()) {
+				roughness_img->decompress();
+			}
+		}
+		roughness_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
+	}
+	if (metallic_img.is_valid()) {
+		if (!metallic_img->empty()) {
+			if (metallic_img->is_compressed()) {
+				metallic_img->decompress();
+			}
+		}
+		metallic_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
+	}
 	Ref<Image> img;
 	img.instance();
 	img->create(width, height, false, Image::FORMAT_RGBA8);
@@ -283,7 +327,6 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 			for (int32_t x = 0; x < img->get_width(); x++) {
 				Color orm;
 				if (ao_img.is_valid() && !ao_img->empty()) {
-					ao_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 					ao_img->lock();
 					if (material->get_ao_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_RED) {
 						orm.r = ao_img->get_pixel(x, y).r;
@@ -299,9 +342,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 					ao_img->unlock();
 				}
 				float channel_mul = 0.0f;
-				float channel_add = 0.0f;
 				if (roughness_img.is_valid() && !roughness_img->empty()) {
-					roughness_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 					roughness_img->lock();
 					if (material->get_roughness_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_RED) {
 						orm.g = roughness_img->get_pixel(x, y).r;
@@ -323,9 +364,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 					orm.g = material->get_roughness();
 				}
 				if (metallic_img.is_valid() && !metallic_img->empty()) {
-					metallic_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 					metallic_img->lock();
-
 					if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_RED) {
 						orm.b = metallic_img->get_pixel(x, y).r;
 					} else if (material->get_metallic_texture_channel() == SpatialMaterial::TEXTURE_CHANNEL_GREEN) {
@@ -343,7 +382,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 					channel_mul = material->get_metallic();
 					orm.b = orm.b * channel_mul;
 				} else {
-					orm.b = 1.0;
+					orm.b = material->get_metallic();
 				}
 				img->lock();
 				img->set_pixel(x, y, orm);
