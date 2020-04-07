@@ -249,10 +249,9 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Map<u
 	Ref<Image> img;
 	float width = 1;
 	float height = 1;
-	Ref<Image> ao_img;
 	material = state.material_cache.get(chart.material);
 	ERR_FAIL_COND_V(material.is_null(), nullptr);
-	ao_img = material->get_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION);
+	Ref<Image> ao_img = material->get_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION);
 	Ref<Image> metallic_img = material->get_texture(SpatialMaterial::TEXTURE_METALLIC);
 	Ref<Image> roughness_img = material->get_texture(SpatialMaterial::TEXTURE_ROUGHNESS);
 	Ref<Image> albedo_img = material->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
