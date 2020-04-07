@@ -398,7 +398,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 					channel_mul = material->get_metallic();
 					orm.b = orm.b * channel_mul;
 				} else {
-					orm.b = material->get_metallic();
+					orm.b = 1.0f;
 				}
 				img->lock();
 				img->set_pixel(x, y, orm);
