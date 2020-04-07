@@ -422,6 +422,11 @@ private:
 	};
 
 	void _find_all_mesh_instances(Vector<MeshInstance *> &r_items, Node *p_current_node, const Node *p_owner);
+	struct MaterialImageCache {
+		Ref<Image> albedo_img;
+		Ref<Image> normal_img;
+		Ref<Image> orm_img;
+	};
 	struct MergeState {
 		Node *p_root;
 		xatlas::Atlas *atlas;
@@ -434,6 +439,7 @@ private:
 		Vector<AtlasLookupTexel> &atlas_lookup;
 		Vector<Ref<Material> > &material_cache;
 		Map<String, Ref<Image> > texture_atlas;
+		Map<int32_t, MaterialImageCache> material_image_cache;
 	};
 	Ref<Image> dilate(Ref<Image> source_image);
 

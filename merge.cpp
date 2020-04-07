@@ -189,7 +189,17 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 	_generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, vertex_to_material, material_cache, pack_options);
 	atlas_lookup.resize(atlas->width * atlas->height);
 	Map<String, Ref<Image> > texture_atlas;
+
 	MergeState state = { p_root, atlas, mesh_items, vertex_to_material, uv_groups, model_vertices, p_root->get_name(), pack_options, atlas_lookup, material_cache, texture_atlas };
+
+	for (int32_t material_cache_i = 0; material_cache_i < state.material_cache.size(); material_cache_i++) {
+		Ref<SpatialMaterial> material = state.material_cache[material_cache_i];
+		MaterialImageCache cache;
+		cache.albedo_img = _get_source_texture(state, material, "albedo");
+		cache.normal_img = _get_source_texture(state, material, "normal");
+		cache.orm_img = _get_source_texture(state, material, "orm");
+		state.material_image_cache[material_cache_i] = cache;
+	}
 
 	print_line("Generating albedo texture atlas.");
 	_generate_texture_atlas(state, "albedo");
@@ -214,8 +224,14 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 		print_line("  mesh atlas " + itos(mesh_i));
 		for (uint32_t chart_i = 0; chart_i < mesh.chartCount; chart_i++) {
 			const xatlas::Chart &chart = mesh.chartArray[chart_i];
-			Ref<SpatialMaterial> material = state.material_cache.get(chart.material);
-			Ref<Image> img = _get_source_texture(state, material, texture_type);
+			Ref<Image> img;
+			if (texture_type == "albedo") {
+				img = state.material_image_cache[chart.material].albedo_img;
+			} else if (texture_type == "normal") {
+				img = state.material_image_cache[chart.material].normal_img;
+			} else if (texture_type == "orm") {
+				img = state.material_image_cache[chart.material].orm_img;
+			}
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
 			Ref<ImageTexture> image_texture;
 			image_texture.instance();
