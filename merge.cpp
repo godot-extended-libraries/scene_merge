@@ -232,6 +232,7 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 			} else if (texture_type == "orm") {
 				img = state.material_image_cache[chart.material].orm_img;
 			}
+			ERR_CONTINUE(img.is_null());
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
 			Ref<ImageTexture> image_texture;
 			image_texture.instance();
@@ -261,9 +262,14 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 }
 
 Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const Ref<SpatialMaterial> material, String texture_type) {
-	ERR_FAIL_COND_V(material.is_null(), nullptr);
 	float width = 1;
 	float height = 1;
+	if (material.is_null()) {
+		Ref<Image> img;
+		img.instance();
+		img->create(width, height, false, Image::FORMAT_RGBA8);
+		return img;
+	}
 	Ref<Texture> ao_texture = material->get_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION);
 	Ref<Image> ao_img;
 	if (ao_texture.is_valid()) {
@@ -406,47 +412,37 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 			}
 		}
 	} else if (texture_type == "albedo") {
-		tex = material->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
 		Color color_mul;
 		Color color_add;
-		if (tex.is_valid()) {
+		if (albedo_img.is_valid()) {
 			color_mul = material->get_albedo();
-			color_add = Color(0, 0, 0);
+			color_add = Color(0, 0, 0, 0);
+			albedo_img->lock();
 		} else {
-			color_mul = Color(1, 1, 1);
+			color_mul = Color(0, 0, 0, 0);
 			color_add = material->get_albedo();
-		}
-		if (tex.is_valid()) {
-			img = tex->get_data();
-			if (!img->empty()) {
-				if (img->is_compressed()) {
-					img->decompress();
-				}
-			}
 		}
 		img->lock();
 		for (int32_t y = 0; y < img->get_height(); y++) {
 			for (int32_t x = 0; x < img->get_width(); x++) {
-				Color c = img->get_pixel(x, y);
+				Color c;
+				if (albedo_img.is_valid()) {
+					c = albedo_img->get_pixel(x, y);
+				}
 				c.r = c.r * color_mul.r + color_add.r;
 				c.g = c.g * color_mul.g + color_add.g;
 				c.b = c.b * color_mul.b + color_add.b;
+				c.a = c.a * color_mul.a + color_add.a;
 				img->set_pixel(x, y, c);
 			}
 		}
+		if (albedo_img.is_valid()) {
+			albedo_img->unlock();
+		}
 		img->unlock();
 	} else if (texture_type == "normal") {
-		if (!material->get_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING)) {
-			return img;
-		}
-		tex = material->get_texture(SpatialMaterial::TEXTURE_NORMAL);
-		if (tex.is_valid()) {
-			img = tex->get_data();
-			if (!img->empty()) {
-				if (img->is_compressed()) {
-					img->decompress();
-				}
-			}
+		if (normal_img.is_valid()) {
+			img = normal_img;
 		}
 	}
 	return img;
