@@ -339,6 +339,14 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		}
 		metallic_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 	}
+	if (norrmal_img.is_valid()) {
+		if (!norrmal_img->empty()) {
+			if (norrmal_img->is_compressed()) {
+				norrmal_img->decompress();
+			}
+		}
+		norrmal_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
+	}
 	Ref<Image> img;
 	img.instance();
 	img->create(width, height, false, Image::FORMAT_RGBA8);
