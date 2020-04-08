@@ -315,6 +315,14 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		width = MAX(width, normal_img->get_width());
 		height = MAX(height, normal_img->get_height());
 	}
+	if (albedo_img.is_valid()) {
+		if (!albedo_img->empty()) {
+			if (albedo_img->is_compressed()) {
+				albedo_img->decompress();
+			}
+		}
+		albedo_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
+	}
 	if (ao_img.is_valid()) {
 		if (!ao_img->empty()) {
 			if (ao_img->is_compressed()) {
