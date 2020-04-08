@@ -288,7 +288,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 	Ref<Texture> albedo_texture = material->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
 	Ref<Image> albedo_img;
 	if (albedo_texture.is_valid()) {
-		roughness_img = albedo_texture->get_data();
+		albedo_img = albedo_texture->get_data();
 	}
 	Ref<Texture> normal_texture = material->get_texture(SpatialMaterial::TEXTURE_NORMAL);
 	Ref<Image> normal_img;
