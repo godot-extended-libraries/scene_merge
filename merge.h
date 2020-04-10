@@ -420,7 +420,7 @@ private:
 		Vector3 normal;
 		Vector2 uv;
 	};
-
+	void _find_all_animated_meshes(Vector<MeshInstance *> &r_items, Node *p_current_node, const Node *p_owner);
 	void _find_all_mesh_instances(Vector<MeshInstance *> &r_items, Node *p_current_node, const Node *p_owner);
 	struct MaterialImageCache {
 		Ref<Image> albedo_img;

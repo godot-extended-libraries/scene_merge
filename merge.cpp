@@ -147,11 +147,43 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 	}
 }
 
+void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshInstance *> &r_items, Node *p_current_node, const Node *p_owner) {
+	AnimationPlayer *ap = Object::cast_to<AnimationPlayer>(p_current_node);
+	if (ap) {
+		List<StringName> animation_names;
+		ap->get_animation_list(&animation_names);
+		Map<String, MeshInstance *> paths;
+		for (int32_t i = 0; i < r_items.size(); i++) {
+			MeshInstance *mi = r_items[i];
+			String path = ap->get_parent()->get_path_to(mi);
+			paths.insert(path, mi);
+		}
+		for (int32_t anim_i = 0; anim_i < animation_names.size(); anim_i++) {
+			Ref<Animation> anim = ap->get_animation(animation_names[anim_i]);
+			for (Map<String, MeshInstance *>::Element *E = paths.front(); E; E = E->next()) {
+				String path = E->key();
+				for (int32_t track_i = 0; track_i < anim->get_track_count(); track_i++) {
+					NodePath anim_path = anim->track_get_path(track_i);
+					String anim_path_string = anim_path;
+					if (path.begins_with(anim_path_string) && r_items.find(E->get()) != -1) {
+						r_items.erase(E->get());
+					}
+				}
+			}
+		}
+	}
+	for (int32_t child_i = 0; child_i < p_current_node->get_child_count(); child_i++) {
+		_find_all_animated_meshes(r_items, p_current_node->get_child(child_i), p_owner);
+	}
+}
+
 Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 	Vector<MeshInstance *> mesh_items;
 	_find_all_mesh_instances(mesh_items, p_root, p_root);
+	_find_all_animated_meshes(mesh_items, p_root, p_root);
 	Vector<MeshInstance *> original_mesh_items;
 	_find_all_mesh_instances(original_mesh_items, p_original_root, p_original_root);
+	_find_all_animated_meshes(original_mesh_items, p_original_root, p_original_root);
 	if (!original_mesh_items.size()) {
 		return p_root;
 	}
@@ -292,7 +324,7 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	// Rasterize chart triangles.
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
-		print_line("  mesh atlas " + itos(mesh_i));
+		print_line(" mesh atlas stage " + itos(mesh_i) + " of " + itos(state.atlas->meshCount - 1));
 		for (uint32_t chart_i = 0; chart_i < mesh.chartCount; chart_i++) {
 			const xatlas::Chart &chart = mesh.chartArray[chart_i];
 			Ref<Image> img;
