@@ -194,6 +194,46 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 
 	for (int32_t material_cache_i = 0; material_cache_i < state.material_cache.size(); material_cache_i++) {
 		Ref<SpatialMaterial> material = state.material_cache[material_cache_i];
+		if (material.is_null()) {
+			continue;
+		}
+		if (material->get_texture(SpatialMaterial::TEXTURE_ALBEDO).is_null()) {
+			Ref<Image> img;
+			img.instance();
+			img->create(512, 512, false, Image::FORMAT_RGBA8);
+			img->fill(material->get_albedo());
+			material->set_albedo(Color(1.0f, 1.0f, 1.0f));
+			Ref<ImageTexture> tex;
+			tex.instance();
+			tex->create_from_image(img);
+			material->set_texture(SpatialMaterial::TEXTURE_ALBEDO, tex);
+		}
+		if (material->get_texture(SpatialMaterial::TEXTURE_ROUGHNESS).is_null()) {
+			Ref<Image> img;
+			img.instance();
+			img->create(512, 512, false, Image::FORMAT_RGBA8);
+			Color c = Color(1.0f, material->get_roughness(), 1.0f);
+			material->set_roughness(1.0f);
+			img->fill(c);
+			Ref<ImageTexture> tex;
+			tex.instance();
+			tex->create_from_image(img);
+			material->set_texture(SpatialMaterial::TEXTURE_ROUGHNESS, tex);
+			material->set_roughness_texture_channel(SpatialMaterial::TextureChannel::TEXTURE_CHANNEL_GREEN);
+		}
+		if (material->get_texture(SpatialMaterial::TEXTURE_METALLIC).is_null()) {
+			Ref<Image> img;
+			img.instance();
+			img->create(32, 32, false, Image::FORMAT_RGBA8);
+			Color c = Color(1.0f, material->get_metallic(), 1.0f);
+			material->set_metallic(1.0f);
+			img->fill(c);
+			Ref<ImageTexture> tex;
+			tex.instance();
+			tex->create_from_image(img);
+			material->set_texture(SpatialMaterial::TEXTURE_METALLIC, tex);
+			material->set_roughness_texture_channel(SpatialMaterial::TextureChannel::TEXTURE_CHANNEL_GREEN);
+		}
 		MaterialImageCache cache;
 		cache.albedo_img = _get_source_texture(state, material, "albedo");
 		cache.normal_img = _get_source_texture(state, material, "normal");
@@ -420,8 +460,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 					channel_mul = material->get_metallic();
 					orm.b = orm.b * channel_mul;
 				} else {
-				    // TODO FIX
-					orm.b = 1.0f;
+					orm.b = material->get_metallic();
 				}
 				img->lock();
 				img->set_pixel(x, y, orm);
@@ -658,9 +697,25 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 
 void MeshMergeMaterialRepack::map_vertex_to_material(const Vector<MeshInstance *> mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache) {
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
+		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i]->get_mesh();
+		if (array_mesh.is_valid()) {
+			bool has_uvs = true;
+			for (int32_t j = 0; j < mesh_items[mesh_i]->get_mesh()->get_surface_count(); j++) {
+				Array mesh = array_mesh->surface_get_arrays(j);
+				Array uvs = mesh[ArrayMesh::ARRAY_TEX_UV];
+				if (!uvs.size()) {
+					has_uvs = has_uvs && false;
+				}
+			}
+			if (!has_uvs) {
+				array_mesh->mesh_unwrap(Transform(), 2.0f);
+			}
+			mesh_items[mesh_i]->set_mesh(array_mesh);
+		}
 		for (int32_t j = 0; j < mesh_items[mesh_i]->get_mesh()->get_surface_count(); j++) {
 			Array mesh = mesh_items[mesh_i]->get_mesh()->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
+
 			Array materials;
 			materials.resize(indices.size());
 			Ref<Material> mat = mesh_items[mesh_i]->get_mesh()->surface_get_material(j);
@@ -679,7 +734,7 @@ void MeshMergeMaterialRepack::map_vertex_to_material(const Vector<MeshInstance *
 					materials[index_i] = new_mat;
 				}
 			}
-			vertex_to_material.push_back(materials);
+			vertex_to_material.push_back(materials.duplicate());
 		}
 	}
 }
