@@ -324,7 +324,7 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	// Rasterize chart triangles.
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
-		print_line(" mesh atlas stage " + itos(mesh_i) + " of " + itos(state.atlas->meshCount - 1));
+		print_line(" mesh atlas stage " + itos(mesh_i + 1) + " of " + itos(state.atlas->meshCount));
 		for (uint32_t chart_i = 0; chart_i < mesh.chartCount; chart_i++) {
 			const xatlas::Chart &chart = mesh.chartArray[chart_i];
 			Ref<Image> img;
