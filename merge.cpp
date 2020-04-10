@@ -126,9 +126,18 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 			bool has_blends = false;
 			bool has_bones = false;
 			bool has_transparency = false;
+			bool has_oversized_uvs = false;
 			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 				Array array = array_mesh->surface_get_arrays(surface_i);
 				Array bones = array[ArrayMesh::ARRAY_BONES];
+				Array uvs = array[ArrayMesh::ARRAY_TEX_UV];
+				for (int32_t uv_i = 0; uv_i < uvs.size(); uv_i++) {
+					Vector2 uv = uvs[uv_i];
+					if (uv.x < 0.0f || uv.x > 1.0f || uv.y < 0.0f || uv.y > 1.0f) {
+						has_oversized_uvs |= true;
+						break;
+					}
+				}
 				has_bones |= bones.size() != 0;
 				has_blends |= array_mesh->get_blend_shape_count() != 0;
 				Ref<SpatialMaterial> spatial_mat = array_mesh->surface_get_material(surface_i);
@@ -137,7 +146,7 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 					has_transparency |= spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) || spatial_mat->get_flag(SpatialMaterial::FLAG_USE_ALPHA_SCISSOR);
 				}
 			}
-			if (!has_blends && !has_bones && !has_transparency) {
+			if (!has_blends && !has_bones && !has_transparency && !has_oversized_uvs) {
 				r_items.push_back(mi);
 			}
 		}
@@ -643,9 +652,9 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 			const Array materials_array = vertex_to_material[mesh_count];
 			for (int32_t index_i = 0; index_i < mesh_indices.size(); index_i++) {
 				indexes.write[index_i] = mesh_indices[index_i];
-				ERR_FAIL_COND(index_i >= materials_array.size());
+				ERR_FAIL_INDEX(index_i, materials_array.size());
 				Ref<Material> material = materials_array[index_i];
-				if (!material.is_valid()) {
+				if (material.is_null()) {
 					continue;
 				}
 				if (material_cache.find(material) == -1) {
@@ -934,6 +943,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			Ref<Image> img = dilate(ORM->get());
 			texture->create_from_image(img);
 			texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			mat->set_cull_mode(SpatialMaterial::CULL_DISABLED);
 			mat->set_ao_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_RED);
 			mat->set_feature(SpatialMaterial::FEATURE_AMBIENT_OCCLUSION, true);
 			mat->set_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION, texture);
