@@ -426,6 +426,7 @@ private:
 		Ref<Image> albedo_img;
 		Ref<Image> normal_img;
 		Ref<Image> orm_img;
+		Ref<Image> emission_img;
 	};
 	struct MergeState {
 		Node *p_root;

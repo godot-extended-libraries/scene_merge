@@ -126,7 +126,6 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 			bool has_blends = false;
 			bool has_bones = false;
 			bool has_transparency = false;
-			bool has_emission = false;
 			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 				Array array = array_mesh->surface_get_arrays(surface_i);
 				Array bones = array[ArrayMesh::ARRAY_BONES];
@@ -136,10 +135,9 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 				if (spatial_mat.is_valid()) {
 					Ref<Image> albedo_img = spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
 					has_transparency |= spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) || spatial_mat->get_flag(SpatialMaterial::FLAG_USE_ALPHA_SCISSOR);
-					has_emission |= spatial_mat->get_feature(SpatialMaterial::FEATURE_EMISSION) && spatial_mat->get_emission() != Color() && spatial_mat->get_texture(SpatialMaterial::TEXTURE_EMISSION).is_valid() && spatial_mat->get_emission_energy() != 1.0f;
 				}
 			}
-			if (!has_blends && !has_bones && !has_transparency && !has_emission) {
+			if (!has_blends && !has_bones && !has_transparency) {
 				r_items.push_back(mi);
 			}
 		}
@@ -208,6 +206,34 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 			tex->create_from_image(img);
 			material->set_texture(SpatialMaterial::TEXTURE_ALBEDO, tex);
 		}
+		if (material->get_texture(SpatialMaterial::TEXTURE_EMISSION).is_null()) {
+			Ref<Image> img;
+			img.instance();
+			img->create(512, 512, false, Image::FORMAT_RGBA8);
+			img->fill(material->get_emission());
+
+			Color emission_col = material->get_emission();
+			float emission_energy = material->get_emission_energy();
+			Color color_mul;
+			Color color_add;
+			if (material->get_emission_operator() == SpatialMaterial::EMISSION_OP_ADD) {
+				color_mul = Color(1, 1, 1) * emission_energy;
+				color_add = emission_col * emission_energy;
+			} else {
+				color_mul = emission_col * emission_energy;
+				color_add = Color(0, 0, 0);
+			}
+			material->set_feature(SpatialMaterial::FEATURE_EMISSION, true);
+			Color c;
+			c.r = c.r * color_mul.r + color_add.r;
+			c.g = c.g * color_mul.g + color_add.g;
+			c.b = c.b * color_mul.b + color_add.b;
+			material->set_emission(c);
+			Ref<ImageTexture> tex;
+			tex.instance();
+			tex->create_from_image(img);
+			material->set_texture(SpatialMaterial::TEXTURE_EMISSION, tex);
+		}
 		if (material->get_texture(SpatialMaterial::TEXTURE_ROUGHNESS).is_null()) {
 			Ref<Image> img;
 			img.instance();
@@ -238,15 +264,20 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		cache.albedo_img = _get_source_texture(state, material, "albedo");
 		cache.normal_img = _get_source_texture(state, material, "normal");
 		cache.orm_img = _get_source_texture(state, material, "orm");
+		cache.emission_img = _get_source_texture(state, material, "emission");
 		state.material_image_cache[material_cache_i] = cache;
 	}
 
 	print_line("Generating albedo texture atlas.");
 	_generate_texture_atlas(state, "albedo");
+	print_line("Generating emission texture atlas.");
+	_generate_texture_atlas(state, "emission");
 	print_line("Generating normal texture atlas.");
 	_generate_texture_atlas(state, "normal");
 	print_line("Generating orm texture atlas.");
 	_generate_texture_atlas(state, "orm");
+	print_line("Generating emission texture atlas.");
+	_generate_texture_atlas(state, "emission");
 	ERR_FAIL_COND_V(state.atlas->width <= 0 && state.atlas->height <= 0, state.p_root);
 	p_root = _output(state);
 
@@ -271,6 +302,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				img = state.material_image_cache[chart.material].normal_img;
 			} else if (texture_type == "orm") {
 				img = state.material_image_cache[chart.material].orm_img;
+			} else if (texture_type == "emission") {
+				img = state.material_image_cache[chart.material].emission_img;
 			}
 			ERR_CONTINUE(img.is_null());
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
@@ -335,6 +368,11 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 	if (normal_texture.is_valid()) {
 		normal_img = normal_texture->get_data();
 	}
+	Ref<Texture> emission_texture = material->get_texture(SpatialMaterial::TEXTURE_EMISSION);
+	Ref<Image> emission_img;
+	if (emission_texture.is_valid()) {
+		emission_img = emission_texture->get_data();
+	}
 	if (ao_img.is_valid() && !ao_img->empty()) {
 		width = MAX(width, ao_img->get_width());
 		height = MAX(height, ao_img->get_height());
@@ -350,6 +388,10 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 	if (albedo_img.is_valid() && !albedo_img->empty()) {
 		width = MAX(width, albedo_img->get_width());
 		height = MAX(height, albedo_img->get_height());
+	}
+	if (emission_img.is_valid() && !emission_img->empty()) {
+		width = MAX(width, emission_img->get_width());
+		height = MAX(height, emission_img->get_height());
 	}
 	if (normal_img.is_valid() && !normal_img->empty()) {
 		width = MAX(width, normal_img->get_width());
@@ -394,6 +436,14 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 			}
 		}
 		normal_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
+	}
+	if (emission_img.is_valid()) {
+		if (!emission_img->empty()) {
+			if (emission_img->is_compressed()) {
+				emission_img->decompress();
+			}
+		}
+		emission_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 	}
 	Ref<Image> img;
 	img.instance();
@@ -500,6 +550,31 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		if (normal_img.is_valid()) {
 			img = normal_img;
 		}
+	} else if (texture_type == "emission") {
+		Color emission_col = material->get_emission();
+		float emission_energy = material->get_emission_energy();
+		Color color_mul;
+		Color color_add;
+		if (material->get_emission_operator() == SpatialMaterial::EMISSION_OP_ADD) {
+			color_mul = Color(1, 1, 1) * emission_energy;
+			color_add = emission_col * emission_energy;
+		} else {
+			color_mul = emission_col * emission_energy;
+			color_add = Color(0, 0, 0);
+		}
+		emission_img->lock();
+		img->lock();
+		for (int32_t y = 0; y < img->get_height(); y++) {
+			for (int32_t x = 0; x < img->get_width(); x++) {
+				Color c = emission_img->get_pixel(x, y);
+				c.r = c.r * color_mul.r + color_add.r;
+				c.g = c.g * color_mul.g + color_add.g;
+				c.b = c.b * color_mul.b + color_add.b;
+				img->set_pixel(x, y, c);
+			}
+		}
+		emission_img->unlock();
+		img->unlock();
 	}
 	return img;
 }
@@ -786,6 +861,16 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			texture->create_from_image(img);
 			texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
 			mat->set_texture(SpatialMaterial::TEXTURE_ALBEDO, texture);
+		}
+		Map<String, Ref<Image> >::Element *E = state.texture_atlas.find("emission");
+		if (E && !E->get()->empty()) {
+			Ref<ImageTexture> texture;
+			texture.instance();
+			Ref<Image> img = dilate(E->get());
+			texture->create_from_image(img);
+			texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			mat->set_feature(SpatialMaterial::FEATURE_EMISSION, true);
+			mat->set_texture(SpatialMaterial::TEXTURE_EMISSION, texture);
 		}
 		Map<String, Ref<Image> >::Element *N = state.texture_atlas.find("normal");
 		if (N && !N->get()->empty()) {
