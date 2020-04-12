@@ -661,7 +661,6 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 			mesh_count++;
 		}
 	}
-	pack_options.padding = 32;
 	pack_options.texelsPerUnit = 1.0f;
 	pack_options.maxChartSize = 4096;
 	pack_options.blockAlign = true;
