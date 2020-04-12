@@ -407,7 +407,7 @@ private:
 	struct SetAtlasTexelArgs {
 		Ref<Image> atlasData;
 		Ref<Image> sourceTexture;
-		Vector<AtlasLookupTexel> atlas_lookup;
+		AtlasLookupTexel* atlas_lookup;
 		uint16_t material_index = 0;
 		Vector2 source_uvs[3];
 		uint32_t atlas_width = 0;

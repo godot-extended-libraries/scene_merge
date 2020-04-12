@@ -105,7 +105,7 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 		const Color color = args->sourceTexture->get_pixel(sx, sy);
 		args->atlasData->set_pixel(x, y, color);
 
-		AtlasLookupTexel &lookup = args->atlas_lookup.write[x * y + args->atlas_width];
+		AtlasLookupTexel &lookup = args->atlas_lookup[x * y + args->atlas_width];
 		lookup.material_index = args->material_index;
 		lookup.x = (uint16_t)sx;
 		lookup.y = (uint16_t)sy;
@@ -348,7 +348,7 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 			SetAtlasTexelArgs args;
 			args.sourceTexture = img;
 			args.atlasData = atlas_img;
-			args.atlas_lookup = state.atlas_lookup;
+			args.atlas_lookup = state.atlas_lookup.ptrw();
 			args.material_index = (uint16_t)chart.material;
 			for (uint32_t face_i = 0; face_i < chart.faceCount; face_i++) {
 				Vector2 v[3];
