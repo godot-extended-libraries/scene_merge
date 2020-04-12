@@ -102,12 +102,8 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 		if ((int32_t)sy >= _height) {
 			sy = Math::fmod(sy, _height);
 		}
-		args->sourceTexture->lock();
 		const Color color = args->sourceTexture->get_pixel(sx, sy);
-		args->sourceTexture->unlock();
-		args->atlasData->lock();
 		args->atlasData->set_pixel(x, y, color);
-		args->atlasData->unlock();
 
 		AtlasLookupTexel &lookup = args->atlas_lookup.write[x * y + args->atlas_width];
 		lookup.material_index = args->material_index;
@@ -365,7 +361,11 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				}
 				Triangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
+				args.sourceTexture->lock();
+				args.atlasData->lock();
 				tri.drawAA(setAtlasTexel, &args);
+				args.sourceTexture->unlock();
+				args.atlasData->unlock();
 			}
 		}
 	}
