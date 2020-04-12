@@ -964,7 +964,13 @@ void SceneMergePlugin::merge(Variant p_user_data) {
 		file_export_lib->add_filter("*." + extensions[extension_i] + " ; " + extensions[extension_i].to_upper());
 	}
 	file_export_lib->popup_centered_ratio();
-	file_export_lib->set_title(TTR("Merge Scene"));
+	file_export_lib->set_title(TTR("Merge Scene"));	
+	Node *root = editor->get_tree()->get_edited_scene_root();
+	String filename = String(root->get_filename().get_file().get_basename());
+	if (filename.empty()) {
+		filename = root->get_name();
+	}
+	file_export_lib->set_current_file(filename + String(".scn"));
 }
 
 void SceneMergePlugin::_dialog_action(String p_file) {
