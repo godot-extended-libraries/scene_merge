@@ -422,8 +422,8 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		width = MAX(width, normal_img->get_width());
 		height = MAX(height, normal_img->get_height());
 	}
-	width = MIN(width, texture_minimum_side);
-	height = MIN(height, texture_minimum_side);
+	width = MAX(width, texture_minimum_side);
+	height = MAX(height, texture_minimum_side);
 	if (albedo_img.is_valid()) {
 		if (!albedo_img->empty()) {
 			if (albedo_img->is_compressed()) {
