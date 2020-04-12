@@ -88,23 +88,10 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 		// Keep coordinates in range of texture dimensions.
 		int _width = args->sourceTexture->get_width();
 		float sx = sourceUv.x * _width;
-		while (sx < 0) {
-			sx += _width;
-		}
-		if ((int32_t)sx >= _width) {
-			sx = Math::fmod(sx, _width);
-		}
 		int _height = args->sourceTexture->get_height();
 		float sy = sourceUv.y * _height;
-		while (sy < 0) {
-			sy += _height;
-		}
-		if ((int32_t)sy >= _height) {
-			sy = Math::fmod(sy, _height);
-		}
 		const Color color = args->sourceTexture->get_pixel(sx, sy);
 		args->atlasData->set_pixel(x, y, color);
-
 		AtlasLookupTexel &lookup = args->atlas_lookup[x * y + args->atlas_width];
 		lookup.material_index = args->material_index;
 		lookup.x = (uint16_t)sx;
