@@ -348,9 +348,6 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 			}
 			ERR_CONTINUE(img.is_null());
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
-			Ref<ImageTexture> image_texture;
-			image_texture.instance();
-			image_texture->create_from_image(img);
 			img->convert(Image::FORMAT_RGBA8);
 			SetAtlasTexelArgs args;
 			args.sourceTexture = img;
