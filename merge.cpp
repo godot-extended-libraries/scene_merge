@@ -222,7 +222,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		if (material->get_texture(SpatialMaterial::TEXTURE_ALBEDO).is_null()) {
 			Ref<Image> img;
 			img.instance();
-			img->create(512, 512, false, Image::FORMAT_RGBA8);
+			img->create(texture_minimum_side, texture_minimum_side, false, Image::FORMAT_RGBA8);
 			img->fill(material->get_albedo());
 			material->set_albedo(Color(1.0f, 1.0f, 1.0f));
 			Ref<ImageTexture> tex;
@@ -233,7 +233,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		if (material->get_texture(SpatialMaterial::TEXTURE_EMISSION).is_null()) {
 			Ref<Image> img;
 			img.instance();
-			img->create(512, 512, false, Image::FORMAT_RGBA8);
+			img->create(texture_minimum_side, texture_minimum_side, false, Image::FORMAT_RGBA8);
 			img->fill(material->get_emission());
 
 			Color emission_col = material->get_emission();
@@ -261,7 +261,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		if (material->get_texture(SpatialMaterial::TEXTURE_ROUGHNESS).is_null()) {
 			Ref<Image> img;
 			img.instance();
-			img->create(512, 512, false, Image::FORMAT_RGBA8);
+			img->create(texture_minimum_side, texture_minimum_side, false, Image::FORMAT_RGBA8);
 			Color c = Color(1.0f, material->get_roughness(), 1.0f);
 			material->set_roughness(1.0f);
 			img->fill(c);
@@ -274,7 +274,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		if (material->get_texture(SpatialMaterial::TEXTURE_METALLIC).is_null()) {
 			Ref<Image> img;
 			img.instance();
-			img->create(32, 32, false, Image::FORMAT_RGBA8);
+			img->create(texture_minimum_side, texture_minimum_side, false, Image::FORMAT_RGBA8);
 			Color c = Color(1.0f, material->get_metallic(), 1.0f);
 			material->set_metallic(1.0f);
 			img->fill(c);
@@ -282,7 +282,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 			tex.instance();
 			tex->create_from_image(img);
 			material->set_texture(SpatialMaterial::TEXTURE_METALLIC, tex);
-			material->set_roughness_texture_channel(SpatialMaterial::TextureChannel::TEXTURE_CHANNEL_GREEN);
+			material->set_metallic_texture_channel(SpatialMaterial::TextureChannel::TEXTURE_CHANNEL_GREEN);
 		}
 		MaterialImageCache cache;
 		cache.albedo_img = _get_source_texture(state, material, "albedo");
@@ -422,6 +422,8 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		width = MAX(width, normal_img->get_width());
 		height = MAX(height, normal_img->get_height());
 	}
+	width = MIN(width, texture_minimum_side);
+	height = MIN(height, texture_minimum_side);
 	if (albedo_img.is_valid()) {
 		if (!albedo_img->empty()) {
 			if (albedo_img->is_compressed()) {

@@ -443,7 +443,7 @@ private:
 		Map<int32_t, MaterialImageCache> material_image_cache;
 	};
 	Ref<Image> dilate(Ref<Image> source_image);
-
+	const int32_t texture_minimum_side = 512;
 public:
 	Node *merge(Node *p_root, Node *p_original_root);
 	void _generate_texture_atlas(MergeState &state, String texture_type);
