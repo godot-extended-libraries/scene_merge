@@ -343,8 +343,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 					const uint32_t index = mesh.indexArray[chart.faceArray[face_i] * 3 + l];
 					const xatlas::Vertex &vertex = mesh.vertexArray[index];
 					v[l] = Vector2(vertex.uv[0], vertex.uv[1]);
-					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / img->get_width();
-					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / img->get_height();
+					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / MAX(texture_minimum_side, img->get_width());
+					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / MAX(texture_minimum_side, img->get_height());
 				}
 				Triangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
@@ -360,8 +360,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 }
 
 Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const Ref<SpatialMaterial> material, String texture_type) {
-	float width = texture_minimum_side;
-	float height = texture_minimum_side;
+	int32_t width = texture_minimum_side;
+	int32_t height = texture_minimum_side;
 	if (material.is_null()) {
 		Ref<Image> img;
 		img.instance();
@@ -746,8 +746,8 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshIn
 				const Ref<Texture> tex = Object::cast_to<SpatialMaterial>(*material)->get_texture(SpatialMaterial::TextureParam::TEXTURE_ALBEDO);
 				uvs.write[vertex_i] = r_model_vertices[mesh_count][vertex_i].uv;
 				if (tex.is_valid()) {
-					uvs.write[vertex_i].x *= (float)tex->get_width();
-					uvs.write[vertex_i].y *= (float)tex->get_height();
+					uvs.write[vertex_i].x *= (float)MAX(texture_minimum_side, tex->get_width());
+					uvs.write[vertex_i].y *= (float)MAX(texture_minimum_side, tex->get_height());
 				}
 			}
 			uv_groups.push_back(uvs);
