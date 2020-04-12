@@ -835,7 +835,7 @@ void MeshMergeMaterialRepack::map_vertex_to_material(const Vector<MeshInstance *
 					materials[index_i] = new_mat;
 				}
 			}
-			vertex_to_material.push_back(materials.duplicate());
+			vertex_to_material.push_back(materials);
 		}
 	}
 }
