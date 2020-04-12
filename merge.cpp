@@ -101,16 +101,16 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 	return false;
 }
 
-void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r_items, Node *p_current_node, const Node *p_owner) {
+void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshState> &r_items, Node *p_current_node, const Node *p_owner) {
 	MeshInstance *mi = Object::cast_to<MeshInstance>(p_current_node);
 	if (mi) {
 		Ref<ArrayMesh> array_mesh = mi->get_mesh();
 		if (array_mesh.is_valid()) {
-			bool has_blends = false;
-			bool has_bones = false;
-			bool has_transparency = false;
-			bool has_oversized_uvs = false;
 			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
+				bool has_blends = false;
+				bool has_bones = false;
+				bool has_transparency = false;
+				bool has_oversized_uvs = false;
 				Array array = array_mesh->surface_get_arrays(surface_i);
 				Array bones = array[ArrayMesh::ARRAY_BONES];
 				Array uvs = array[ArrayMesh::ARRAY_TEX_UV];
@@ -128,9 +128,20 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 					Ref<Image> albedo_img = spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
 					has_transparency |= spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) || spatial_mat->get_flag(SpatialMaterial::FLAG_USE_ALPHA_SCISSOR);
 				}
-			}
-			if (!has_blends && !has_bones && !has_transparency && !has_oversized_uvs) {
-				r_items.push_back(mi);
+				if (!has_blends && !has_bones && !has_transparency && !has_oversized_uvs) {
+					MeshState mesh_state;
+					Ref<SurfaceTool> st;
+					st.instance();
+					st->create_from_triangle_arrays(array);
+					Ref<ArrayMesh> split_mesh = st->commit();
+					split_mesh->surface_set_material(0, array_mesh->surface_get_material(surface_i));
+					mesh_state.mesh = split_mesh;
+					if (mi->is_inside_tree()) {
+						mesh_state.path = mi->get_path();
+					}
+					mesh_state.mesh_instance = mi;
+					r_items.push_back(mesh_state);
+				}
 			}
 		}
 	}
@@ -139,20 +150,20 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshInstance *> &r
 	}
 }
 
-void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshInstance *> &r_items, Node *p_current_node, const Node *p_owner) {
+void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshState> &r_items, Node *p_current_node, const Node *p_owner) {
 	AnimationPlayer *ap = Object::cast_to<AnimationPlayer>(p_current_node);
 	if (ap) {
 		List<StringName> animation_names;
 		ap->get_animation_list(&animation_names);
-		Map<String, MeshInstance *> paths;
+		Map<String, MeshState> paths;
 		for (int32_t i = 0; i < r_items.size(); i++) {
-			MeshInstance *mi = r_items[i];
+			MeshInstance *mi = r_items[i].mesh_instance;
 			String path = ap->get_parent()->get_path_to(mi);
-			paths.insert(path, mi);
+			paths.insert(path, r_items[i]);
 		}
 		for (int32_t anim_i = 0; anim_i < animation_names.size(); anim_i++) {
 			Ref<Animation> anim = ap->get_animation(animation_names[anim_i]);
-			for (Map<String, MeshInstance *>::Element *E = paths.front(); E; E = E->next()) {
+			for (Map<String, MeshState>::Element *E = paths.front(); E; E = E->next()) {
 				String path = E->key();
 				for (int32_t track_i = 0; track_i < anim->get_track_count(); track_i++) {
 					NodePath anim_path = anim->track_get_path(track_i);
@@ -170,32 +181,31 @@ void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshInstance *> &
 }
 
 Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
-	Vector<MeshInstance *> mesh_items;
+	Vector<MeshState> mesh_items;
 	_find_all_mesh_instances(mesh_items, p_root, p_root);
 	_find_all_animated_meshes(mesh_items, p_root, p_root);
-	Vector<MeshInstance *> original_mesh_items;
+	Vector<MeshState> original_mesh_items;
 	_find_all_mesh_instances(original_mesh_items, p_original_root, p_original_root);
 	_find_all_animated_meshes(original_mesh_items, p_original_root, p_original_root);
 	if (!original_mesh_items.size()) {
 		return p_root;
 	}
-	Array vertex_to_material;
+	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
 	Ref<Material> empty_material;
 	material_cache.push_back(empty_material);
-	map_vertex_to_material(mesh_items, vertex_to_material, material_cache);
+	map_mesh_to_index_to_material(mesh_items, mesh_to_index_to_material, material_cache);
 
 	Vector<Vector<Vector2> > uv_groups;
 	Vector<Vector<ModelVertex> > model_vertices;
-	scale_uvs_by_texture_dimension(original_mesh_items, mesh_items, uv_groups, vertex_to_material, model_vertices);
+	scale_uvs_by_texture_dimension(original_mesh_items, mesh_items, uv_groups, mesh_to_index_to_material, model_vertices);
 	xatlas::SetPrint(printf, true);
 	xatlas::Atlas *atlas = xatlas::Create();
 
 	int32_t num_surfaces = 0;
-
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		for (int32_t j = 0; j < mesh_items[mesh_i]->get_mesh()->get_surface_count(); j++) {
-			Array mesh = mesh_items[mesh_i]->get_mesh()->surface_get_arrays(j);
+		for(int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
+			Array mesh = mesh_items[mesh_i].mesh->surface_get_arrays(j);
 			if (mesh.empty()) {
 				continue;
 			}
@@ -208,11 +218,11 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 	}
 	xatlas::PackOptions pack_options;
 	Vector<AtlasLookupTexel> atlas_lookup;
-	_generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, vertex_to_material, material_cache, pack_options);
+	_generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, material_cache, pack_options);
 	atlas_lookup.resize(atlas->width * atlas->height);
 	Map<String, Ref<Image> > texture_atlas;
 
-	MergeState state = { p_root, atlas, mesh_items, vertex_to_material, uv_groups, model_vertices, p_root->get_name(), pack_options, atlas_lookup, material_cache, texture_atlas };
+	MergeState state = { p_root, atlas, mesh_items, mesh_to_index_to_material, uv_groups, model_vertices, p_root->get_name(), pack_options, atlas_lookup, material_cache, texture_atlas };
 
 	for (int32_t material_cache_i = 0; material_cache_i < state.material_cache.size(); material_cache_i++) {
 		Ref<SpatialMaterial> material = state.material_cache[material_cache_i];
@@ -222,7 +232,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		if (material->get_texture(SpatialMaterial::TEXTURE_ALBEDO).is_null()) {
 			Ref<Image> img;
 			img.instance();
-			img->create(512, 512, false, Image::FORMAT_RGBA8);
+			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
 			img->fill(material->get_albedo());
 			material->set_albedo(Color(1.0f, 1.0f, 1.0f));
 			Ref<ImageTexture> tex;
@@ -233,7 +243,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		if (material->get_texture(SpatialMaterial::TEXTURE_EMISSION).is_null()) {
 			Ref<Image> img;
 			img.instance();
-			img->create(512, 512, false, Image::FORMAT_RGBA8);
+			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
 			img->fill(material->get_emission());
 
 			Color emission_col = material->get_emission();
@@ -261,7 +271,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		if (material->get_texture(SpatialMaterial::TEXTURE_ROUGHNESS).is_null()) {
 			Ref<Image> img;
 			img.instance();
-			img->create(512, 512, false, Image::FORMAT_RGBA8);
+			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
 			Color c = Color(1.0f, material->get_roughness(), 1.0f);
 			material->set_roughness(1.0f);
 			img->fill(c);
@@ -274,7 +284,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		if (material->get_texture(SpatialMaterial::TEXTURE_METALLIC).is_null()) {
 			Ref<Image> img;
 			img.instance();
-			img->create(32, 32, false, Image::FORMAT_RGBA8);
+			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
 			Color c = Color(1.0f, material->get_metallic(), 1.0f);
 			material->set_metallic(1.0f);
 			img->fill(c);
@@ -282,7 +292,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 			tex.instance();
 			tex->create_from_image(img);
 			material->set_texture(SpatialMaterial::TEXTURE_METALLIC, tex);
-			material->set_roughness_texture_channel(SpatialMaterial::TextureChannel::TEXTURE_CHANNEL_GREEN);
+			material->set_metallic_texture_channel(SpatialMaterial::TextureChannel::TEXTURE_CHANNEL_GREEN);
 		}
 		MaterialImageCache cache;
 		cache.albedo_img = _get_source_texture(state, material, "albedo");
@@ -360,8 +370,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 }
 
 Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const Ref<SpatialMaterial> material, String texture_type) {
-	float width = 1;
-	float height = 1;
+	float width = default_texture_length;
+	float height = default_texture_length;
 	if (material.is_null()) {
 		Ref<Image> img;
 		img.instance();
@@ -395,6 +405,10 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 	}
 	Ref<Texture> emission_texture = material->get_texture(SpatialMaterial::TEXTURE_EMISSION);
 	Ref<Image> emission_img;
+	if (albedo_img.is_valid() && !albedo_img->empty()) {
+		width = MAX(width, albedo_img->get_width());
+		height = MAX(height, albedo_img->get_height());
+	}
 	if (emission_texture.is_valid()) {
 		emission_img = emission_texture->get_data();
 	}
@@ -409,10 +423,6 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 	if (roughness_img.is_valid() && !roughness_img->empty()) {
 		width = MAX(width, roughness_img->get_width());
 		height = MAX(height, roughness_img->get_height());
-	}
-	if (albedo_img.is_valid() && !albedo_img->empty()) {
-		width = MAX(width, albedo_img->get_width());
-		height = MAX(height, albedo_img->get_height());
 	}
 	if (emission_img.is_valid() && !emission_img->empty()) {
 		width = MAX(width, emission_img->get_width());
@@ -604,20 +614,13 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 	return img;
 }
 
-void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshInstance *> &r_meshes, Array vertex_to_material, const Vector<Ref<Material> > material_cache,
+void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
 		xatlas::PackOptions &pack_options) {
-
-	int32_t mesh_first_index = 0;
 	uint32_t mesh_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < r_meshes.size(); mesh_i++) {
-		for (int32_t j = 0; j < r_meshes[mesh_i]->get_mesh()->get_surface_count(); j++) {
-			// Handle blend shapes?
-			Array mesh = r_meshes[mesh_i]->get_mesh()->surface_get_arrays(j);
+		for (int32_t j = 0; j < r_meshes[mesh_i].mesh->get_surface_count(); j++) {
+			Array mesh = r_meshes[mesh_i].mesh->surface_get_arrays(j);
 			if (mesh.empty()) {
-				continue;
-			}
-			Array vertices = mesh[ArrayMesh::ARRAY_VERTEX];
-			if (vertices.empty()) {
 				continue;
 			}
 			Array indices = mesh[ArrayMesh::ARRAY_INDEX];
@@ -633,18 +636,15 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 			indexes.resize(mesh_indices.size());
 			Vector<uint32_t> materials;
 			materials.resize(mesh_indices.size());
-			const Array materials_array = vertex_to_material[mesh_count];
 			for (int32_t index_i = 0; index_i < mesh_indices.size(); index_i++) {
 				indexes.write[index_i] = mesh_indices[index_i];
-				ERR_FAIL_INDEX(index_i, materials_array.size());
-				Ref<Material> material = materials_array[index_i];
-				if (material.is_null()) {
-					continue;
+			}
+			for (int32_t index_i = 0; index_i < mesh_indices.size(); index_i++) {
+				Ref<Material> mat = r_meshes[mesh_i].mesh->surface_get_material(j);
+				int32_t material_i = material_cache.find(mat);
+				if (material_i != -1) {
+					materials.write[index_i] = material_i;
 				}
-				if (material_cache.find(material) == -1) {
-					continue;
-				}
-				materials.write[index_i] = material_cache.find(material);
 			}
 			meshDecl.indexCount = indexes.size();
 			meshDecl.indexData = indexes.ptr();
@@ -657,27 +657,26 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 				OS::get_singleton()->print("Error adding mesh %d: %s\n", mesh_i, xatlas::StringForEnum(error));
 				ERR_CONTINUE(error != xatlas::AddMeshError::Success);
 			}
-			mesh_first_index += vertices.size();
 			mesh_count++;
 		}
 	}
-	pack_options.padding = 32;
+	pack_options.padding = 32.0f;
 	pack_options.texelsPerUnit = 1.0f;
 	pack_options.maxChartSize = 4096;
 	pack_options.blockAlign = true;
 	xatlas::PackCharts(atlas, pack_options);
 }
 
-void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshInstance *> &original_mesh_items, Vector<MeshInstance *> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices) {
+void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_mesh_to_index_to_material, Vector<Vector<ModelVertex> > &r_model_vertices) {
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		for (int32_t j = 0; j < mesh_items[mesh_i]->get_mesh()->get_surface_count(); j++) {
+		for (int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
 			r_model_vertices.push_back(Vector<ModelVertex>());
 		}
 	}
 	uint32_t mesh_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		for (int32_t surface_i = 0; surface_i < mesh_items[mesh_i]->get_mesh()->get_surface_count(); surface_i++) {
-			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i]->get_mesh();
+		for (int32_t surface_i = 0; surface_i < mesh_items[mesh_i].mesh->get_surface_count(); surface_i++) {
+			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
 			Array mesh = array_mesh->surface_get_arrays(surface_i);
 			if (mesh.empty()) {
 				continue;
@@ -691,7 +690,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshIn
 			Vector<Vector2> uv_arr = mesh[Mesh::ARRAY_TEX_UV];
 			Vector<int32_t> index_arr = mesh[Mesh::ARRAY_INDEX];
 			Vector<Plane> tangent_arr = mesh[Mesh::ARRAY_TANGENT];
-			Transform xform = original_mesh_items[mesh_i]->get_global_transform();
+			Transform xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();
 			Vector<ModelVertex> model_vertices;
 			model_vertices.resize(vertex_arr.size());
 			for (int32_t vertex_i = 0; vertex_i < vertex_arr.size(); vertex_i++) {
@@ -712,8 +711,8 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshIn
 	}
 	mesh_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		for (int32_t j = 0; j < mesh_items[mesh_i]->get_mesh()->get_surface_count(); j++) {
-			Array mesh = mesh_items[mesh_i]->get_mesh()->surface_get_arrays(j);
+		for (int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
+			Array mesh = mesh_items[mesh_i].mesh->surface_get_arrays(j);
 			if (mesh.empty()) {
 				continue;
 			}
@@ -723,34 +722,37 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshIn
 			}
 			Vector<Vector2> uvs;
 			uvs.resize(vertices.size());
+			Vector<int32_t> indices = mesh[ArrayMesh::ARRAY_INDEX];
 			for (uint32_t vertex_i = 0; vertex_i < vertices.size(); vertex_i++) {
-				Ref<SpatialMaterial> empty_material;
-				empty_material.instance();
-				if (mesh_count >= r_vertex_to_material.size()) {
+				if (mesh_count >= r_mesh_to_index_to_material.size()) {
+					uvs.resize(0);
 					break;
 				}
-				Array vertex_to_material = r_vertex_to_material[mesh_count];
-				if (!vertex_to_material.size()) {
+				Array index_to_material = r_mesh_to_index_to_material[mesh_count];
+				if (!index_to_material.size()) {
 					continue;
 				}
-				if (vertex_i >= vertex_to_material.size()) {
+				int32_t index = indices.find(vertex_i);
+				if (index >= index_to_material.size()) {
 					continue;
 				}
-				const Ref<Material> material = vertex_to_material.get(vertex_i);
+				ERR_CONTINUE(index == -1);
+				const Ref<Material> material = index_to_material.get(index);
 				if (material.is_null()) {
+					uvs.resize(0);
 					break;
 				}
-				if (!Object::cast_to<SpatialMaterial>(*material)) {
+				Ref<SpatialMaterial> spatial_material = material;
+				if (spatial_material.is_null()) {
 					continue;
 				}
-				ERR_CONTINUE(material->get_class_name() != empty_material->get_class_name());
-				const Ref<Texture> tex = Object::cast_to<SpatialMaterial>(*material)->get_texture(SpatialMaterial::TextureParam::TEXTURE_ALBEDO);
+				const Ref<Texture> tex = spatial_material->get_texture(SpatialMaterial::TextureParam::TEXTURE_ALBEDO);
 				uvs.write[vertex_i] = r_model_vertices[mesh_count][vertex_i].uv;
 				if (tex.is_valid()) {
 					uvs.write[vertex_i].x *= (float)tex->get_width();
 					uvs.write[vertex_i].y *= (float)tex->get_height();
 				}
-			}
+			}			
 			uv_groups.push_back(uvs);
 			mesh_count++;
 		}
@@ -796,46 +798,33 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 	return target_image;
 }
 
-void MeshMergeMaterialRepack::map_vertex_to_material(const Vector<MeshInstance *> mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache) {
+void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i]->get_mesh();
-		if (array_mesh.is_valid()) {
-			bool has_uvs = true;
-			for (int32_t j = 0; j < mesh_items[mesh_i]->get_mesh()->get_surface_count(); j++) {
-				Array mesh = array_mesh->surface_get_arrays(j);
-				Array uvs = mesh[ArrayMesh::ARRAY_TEX_UV];
-				if (!uvs.size()) {
-					has_uvs = has_uvs && false;
-				}
-			}
-			if (!has_uvs) {
+		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
+		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
+			Array mesh = array_mesh->surface_get_arrays(j);
+			Array uvs = mesh[ArrayMesh::ARRAY_TEX_UV];
+			if (!uvs.size()) {
 				array_mesh->mesh_unwrap(Transform(), 2.0f);
+				break;
 			}
-			mesh_items[mesh_i]->set_mesh(array_mesh);
 		}
-		for (int32_t j = 0; j < mesh_items[mesh_i]->get_mesh()->get_surface_count(); j++) {
-			Array mesh = mesh_items[mesh_i]->get_mesh()->surface_get_arrays(j);
+		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {			
+			Array mesh = array_mesh->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
-
-			Array materials;
-			materials.resize(indices.size());
-			Ref<Material> mat = mesh_items[mesh_i]->get_mesh()->surface_get_material(j);
-			if (mesh_items[mesh_i]->get_surface_material(j).is_valid()) {
-				mat = mesh_items[mesh_i]->get_surface_material(j);
+			Ref<Material> mat = mesh_items[mesh_i].mesh->surface_get_material(j);
+			if (mesh_items[mesh_i].mesh_instance->get_surface_material(j).is_valid()) {
+				mat = mesh_items[mesh_i].mesh_instance->get_surface_material(j);
 			}
 			if (material_cache.find(mat) == -1) {
 				material_cache.push_back(mat);
 			}
+			Array materials;
+			materials.resize(indices.size());
 			for (int32_t index_i = 0; index_i < indices.size(); index_i++) {
-				if (mat.is_valid()) {
-					materials[index_i] = mat;
-				} else {
-					Ref<SpatialMaterial> new_mat;
-					new_mat.instance();
-					materials[index_i] = new_mat;
-				}
+				materials[index_i] = mat;
 			}
-			vertex_to_material.push_back(materials);
+			mesh_to_index_to_material.push_back(materials);
 		}
 	}
 }
@@ -843,12 +832,12 @@ void MeshMergeMaterialRepack::map_vertex_to_material(const Vector<MeshInstance *
 Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 	MeshMergeMaterialRepack::TextureData texture_data;
 	for (int32_t mesh_i = 0; mesh_i < state.r_mesh_items.size(); mesh_i++) {
-		if (state.r_mesh_items[mesh_i]->get_parent()) {
+		if (state.r_mesh_items[mesh_i].mesh_instance->get_parent()) {
 			Spatial *spatial = memnew(Spatial);
-			Transform xform = state.r_mesh_items[mesh_i]->get_transform();
+			Transform xform = state.r_mesh_items[mesh_i].mesh_instance->get_transform();
 			spatial->set_transform(xform);
-			spatial->set_name(state.r_mesh_items[mesh_i]->get_name());
-			state.r_mesh_items[mesh_i]->replace_by(spatial);
+			spatial->set_name(state.r_mesh_items[mesh_i].mesh_instance->get_name());
+			state.r_mesh_items[mesh_i].mesh_instance->replace_by(spatial);
 		}
 	}
 	Ref<SurfaceTool> st_all;
