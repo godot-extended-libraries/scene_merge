@@ -360,8 +360,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 }
 
 Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const Ref<SpatialMaterial> material, String texture_type) {
-	float width = 1;
-	float height = 1;
+	float width = texture_minimum_side;
+	float height = texture_minimum_side;
 	if (material.is_null()) {
 		Ref<Image> img;
 		img.instance();
@@ -422,8 +422,6 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		width = MAX(width, normal_img->get_width());
 		height = MAX(height, normal_img->get_height());
 	}
-	width = MAX(width, texture_minimum_side);
-	height = MAX(height, texture_minimum_side);
 	if (albedo_img.is_valid()) {
 		if (!albedo_img->empty()) {
 			if (albedo_img->is_compressed()) {
