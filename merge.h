@@ -415,27 +415,13 @@ private:
 
 	static bool setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float);
 
-	const int32_t default_texture_length = 512;
-
 	struct ModelVertex {
 		Vector3 pos;
 		Vector3 normal;
 		Vector2 uv;
 	};
-	struct MeshState {		
-		Ref<Mesh> mesh;
-		NodePath path;
-		MeshInstance * mesh_instance;
-		bool operator==(const MeshState& rhs) const {
-			if (rhs.mesh == mesh && rhs.path == path && rhs.mesh_instance == mesh_instance) {
-				return true;
-			}
-			return false;
-		}
-	};
-
-	void _find_all_animated_meshes(Vector<MeshState> &r_items, Node *p_current_node, const Node *p_owner);
-	void _find_all_mesh_instances(Vector<MeshState> &r_items, Node *p_current_node, const Node *p_owner);
+	void _find_all_animated_meshes(Vector<MeshInstance *> &r_items, Node *p_current_node, const Node *p_owner);
+	void _find_all_mesh_instances(Vector<MeshInstance *> &r_items, Node *p_current_node, const Node *p_owner);
 	struct MaterialImageCache {
 		Ref<Image> albedo_img;
 		Ref<Image> normal_img;
@@ -445,7 +431,7 @@ private:
 	struct MergeState {
 		Node *p_root;
 		xatlas::Atlas *atlas;
-		Vector<MeshState> &r_mesh_items;
+		Vector<MeshInstance *> &r_mesh_items;
 		Array &vertex_to_material;
 		const Vector<Vector<Vector2> > uvs;
 		const Vector<Vector<ModelVertex> > &model_vertices;
@@ -462,10 +448,10 @@ public:
 	Node *merge(Node *p_root, Node *p_original_root);
 	void _generate_texture_atlas(MergeState &state, String texture_type);
 	Ref<Image> _get_source_texture(MergeState &state, Ref<SpatialMaterial> material, String texture_type);
-	void _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
+	void _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshInstance *> &r_meshes, Array vertex_to_material, const Vector<Ref<Material> > material_cache,
 			xatlas::PackOptions &pack_options);
-	void scale_uvs_by_texture_dimension(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
-	void map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache);
+	void scale_uvs_by_texture_dimension(const Vector<MeshInstance *> &original_mesh_items, Vector<MeshInstance *> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
+	void map_vertex_to_material(const Vector<MeshInstance *> mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache);
 	Node *_output(MergeState &state);
 };
 #endif
