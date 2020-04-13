@@ -272,7 +272,9 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 			Ref<Image> img;
 			img.instance();
 			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
-			Color c = Color(1.0f, 1.0f, 1.0f);
+			float roughness = material->get_roughness();
+			Color c = Color(roughness, roughness, roughness);
+			material->set_roughness(1.0f);
 			img->fill(c);
 			Ref<ImageTexture> tex;
 			tex.instance();
@@ -283,7 +285,8 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 			Ref<Image> img;
 			img.instance();
 			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
-			Color c = Color(1.0f, 1.0f, 1.0f);
+			float metallic = 1.0f;
+			Color c = Color(metallic, metallic, metallic);
 			img->fill(c);
 			Ref<ImageTexture> tex;
 			tex.instance();
@@ -620,13 +623,11 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 				continue;
 			}
 			Array indices = mesh[ArrayMesh::ARRAY_INDEX];
-			Array vertices = mesh[ArrayMesh::ARRAY_VERTEX];
 			if (indices.empty()) {
 				continue;
 			}
 			xatlas::UvMeshDecl meshDecl;
-			r_uvs.write[mesh_count].resize(vertices.size());
-			meshDecl.vertexCount = vertices.size();
+			meshDecl.vertexCount = r_uvs[mesh_count].size();
 			meshDecl.vertexUvData = r_uvs[mesh_count].ptr();
 			meshDecl.vertexStride = sizeof(Vector2);
 			Vector<int32_t> mesh_indices = mesh[Mesh::ARRAY_INDEX];
@@ -682,6 +683,9 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 				continue;
 			}
 			Array vertices = mesh[ArrayMesh::ARRAY_VERTEX];
+			if (vertices.size() == 0) {
+				continue;
+			}
 			Vector<Vector3> vertex_arr = mesh[Mesh::ARRAY_VERTEX];
 			Vector<Vector3> normal_arr = mesh[Mesh::ARRAY_NORMAL];
 			Vector<Vector2> uv_arr = mesh[Mesh::ARRAY_TEX_UV];
@@ -714,19 +718,36 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 				continue;
 			}
 			Vector<Vector3> vertices = mesh[ArrayMesh::ARRAY_VERTEX];
+			if (vertices.size() == 0) {
+				continue;
+			}
 			Vector<Vector2> uvs;
 			uvs.resize(vertices.size());
 			Vector<int32_t> indices = mesh[ArrayMesh::ARRAY_INDEX];
 			for (uint32_t vertex_i = 0; vertex_i < vertices.size(); vertex_i++) {
+				if (mesh_count >= r_mesh_to_index_to_material.size()) {
+					uvs.resize(0);
+					break;
+				}
 				Array index_to_material = r_mesh_to_index_to_material[mesh_count];
+				if (!index_to_material.size()) {
+					continue;
+				}
 				int32_t index = indices.find(vertex_i);
+				if (index >= index_to_material.size()) {
+					continue;
+				}
 				ERR_CONTINUE(index == -1);
 				const Ref<Material> material = index_to_material.get(index);
-				Ref<SpatialMaterial> spatial_material = material;				
-				Ref<Texture> tex;
-				if (spatial_material.is_valid()) {
-					tex = spatial_material->get_texture(SpatialMaterial::TextureParam::TEXTURE_ALBEDO);
-				} 
+				if (material.is_null()) {
+					uvs.resize(0);
+					break;
+				}
+				Ref<SpatialMaterial> spatial_material = material;
+				if (spatial_material.is_null()) {
+					continue;
+				}
+				const Ref<Texture> tex = spatial_material->get_texture(SpatialMaterial::TextureParam::TEXTURE_ALBEDO);
 				uvs.write[vertex_i] = r_model_vertices[mesh_count][vertex_i].uv;
 				if (tex.is_valid()) {
 					uvs.write[vertex_i].x *= (float)MAX(texture_minimum_side, tex->get_width());
