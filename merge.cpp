@@ -272,27 +272,23 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 			Ref<Image> img;
 			img.instance();
 			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
-			Color c = Color(1.0f, material->get_roughness(), 1.0f);
-			material->set_roughness(1.0f);
+			Color c = Color(1.0f, 1.0f, 1.0f);
 			img->fill(c);
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
 			material->set_texture(SpatialMaterial::TEXTURE_ROUGHNESS, tex);
-			material->set_roughness_texture_channel(SpatialMaterial::TextureChannel::TEXTURE_CHANNEL_GREEN);
 		}
 		if (material->get_texture(SpatialMaterial::TEXTURE_METALLIC).is_null()) {
 			Ref<Image> img;
 			img.instance();
 			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
-			Color c = Color(1.0f, material->get_metallic(), 1.0f);
-			material->set_metallic(1.0f);
+			Color c = Color(1.0f, 1.0f, 1.0f);
 			img->fill(c);
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
 			material->set_texture(SpatialMaterial::TEXTURE_METALLIC, tex);
-			material->set_metallic_texture_channel(SpatialMaterial::TextureChannel::TEXTURE_CHANNEL_GREEN);
 		}
 		MaterialImageCache cache;
 		cache.albedo_img = _get_source_texture(state, material, "albedo");
