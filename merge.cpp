@@ -371,9 +371,9 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				args.sourceTexture->unlock();
 				args.atlasData->unlock();
 			}
+			progress_texture_atlas.step(TTR("Processing Chart for Atlas: ") + texture_type + " (" + itos(step) + "/" + itos(mesh.chartCount) + ")", step);
+			step++;
 		}
-		progress_texture_atlas.step(TTR("Processing Mesh for Atlas: ") + texture_type + " (" + itos(step) + "/" + itos(state.atlas->meshCount) + ")", step);
-		step++;
 	}
 	state.texture_atlas.insert(texture_type, atlas_img);
 }
