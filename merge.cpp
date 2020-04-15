@@ -323,7 +323,14 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	atlas_img.instance();
 	atlas_img->create(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
 	// Rasterize chart triangles.	
-	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Scene Atlas"), state.atlas->meshCount);
+
+	int32_t chart_count = 0;
+	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
+		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
+		chart_count += mesh.chartCount;
+	}
+
+	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Scene Atlas"), chart_count);
 	int step = 0;
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
@@ -365,7 +372,7 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				args.atlasData->unlock();
 			}
 		}
-		progress_texture_atlas.step(TTR("Generating Atlas: ") + texture_type + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
+		progress_texture_atlas.step(TTR("Processing Mesh for Atlas: ") + texture_type + " (" + itos(step) + "/" + itos(state.atlas->meshCount) + ")", step);
 		step++;
 	}
 	state.texture_atlas.insert(texture_type, atlas_img);
