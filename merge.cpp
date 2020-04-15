@@ -184,6 +184,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 	Vector<MeshState> mesh_items;
 	_find_all_mesh_instances(mesh_items, p_root, p_root);
 	_find_all_animated_meshes(mesh_items, p_root, p_root);
+
 	Vector<MeshState> original_mesh_items;
 	_find_all_mesh_instances(original_mesh_items, p_original_root, p_original_root);
 	_find_all_animated_meshes(original_mesh_items, p_original_root, p_original_root);
@@ -199,7 +200,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 	Vector<Vector<Vector2> > uv_groups;
 	Vector<Vector<ModelVertex> > model_vertices;
 	scale_uvs_by_texture_dimension(original_mesh_items, mesh_items, uv_groups, mesh_to_index_to_material, model_vertices);
-	xatlas::SetPrint(printf, true);
+	xatlas::SetPrint(printf, false);
 	xatlas::Atlas *atlas = xatlas::Create();
 
 	int32_t num_surfaces = 0;
@@ -224,6 +225,8 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 
 	MergeState state = { p_root, atlas, mesh_items, mesh_to_index_to_material, uv_groups, model_vertices, p_root->get_name(), pack_options, atlas_lookup, material_cache, texture_atlas };
 
+	EditorProgress progress_scene_merge("gen_get_source_material", TTR("Get source material"), state.material_cache.size());
+	int step = 0;
 	for (int32_t material_cache_i = 0; material_cache_i < state.material_cache.size(); material_cache_i++) {
 		Ref<SpatialMaterial> material = state.material_cache[material_cache_i];
 		if (material.is_null()) {
@@ -299,18 +302,14 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		cache.normal_img = _get_source_texture(state, material, "normal");
 		cache.orm_img = _get_source_texture(state, material, "orm");
 		cache.emission_img = _get_source_texture(state, material, "emission");
-		state.material_image_cache[material_cache_i] = cache;
+		state.material_image_cache[material_cache_i] = cache;	
+		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
+		step++;
 	}
-
-	print_line("Generating albedo texture atlas.");
 	_generate_texture_atlas(state, "albedo");
-	print_line("Generating emission texture atlas.");
 	_generate_texture_atlas(state, "emission");
-	print_line("Generating normal texture atlas.");
 	_generate_texture_atlas(state, "normal");
-	print_line("Generating orm texture atlas.");
 	_generate_texture_atlas(state, "orm");
-	print_line("Generating emission texture atlas.");
 	_generate_texture_atlas(state, "emission");
 	ERR_FAIL_COND_V(state.atlas->width <= 0 && state.atlas->height <= 0, state.p_root);
 	p_root = _output(state);
@@ -323,10 +322,11 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	Ref<Image> atlas_img;
 	atlas_img.instance();
 	atlas_img->create(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
-	// Rasterize chart triangles.
+	// Rasterize chart triangles.	
+	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Scene Atlas"), state.atlas->meshCount);
+	int step = 0;
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
-		print_line(" mesh atlas stage " + itos(mesh_i + 1) + " of " + itos(state.atlas->meshCount));
 		for (uint32_t chart_i = 0; chart_i < mesh.chartCount; chart_i++) {
 			const xatlas::Chart &chart = mesh.chartArray[chart_i];
 			Ref<Image> img;
@@ -365,6 +365,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				args.atlasData->unlock();
 			}
 		}
+		progress_texture_atlas.step(TTR("Generating Atlas: ") + texture_type + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
+		step++;
 	}
 	state.texture_atlas.insert(texture_type, atlas_img);
 }
@@ -654,8 +656,7 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 			meshDecl.rotateCharts = false;
 			xatlas::AddMeshError::Enum error = xatlas::AddUvMesh(atlas, meshDecl);
 			if (error != xatlas::AddMeshError::Success) {
-				OS::get_singleton()->print("Error adding mesh %d: %s\n", mesh_i, xatlas::StringForEnum(error));
-				ERR_CONTINUE(error != xatlas::AddMeshError::Success);
+				ERR_CONTINUE_MSG(error != xatlas::AddMeshError::Success, "Error adding mesh %d: %s\n" + itos(mesh_i) + xatlas::StringForEnum(error));
 			}
 			mesh_count++;
 		}
@@ -933,14 +934,13 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 	MeshInstance *mi = memnew(MeshInstance);
 	Ref<ArrayMesh> array_mesh = st_all->commit();
 	mi->set_mesh(array_mesh);
-	mi->set_name(state.p_name + "Merged");
+	mi->set_name(state.p_name);
 	Transform root_xform;
 	Spatial *spatial = Object::cast_to<Spatial>(state.p_root);
 	if (spatial) {
 		root_xform = spatial->get_transform();
 	}
 	mi->set_transform(root_xform.affine_inverse());
-	print_line("Merged scene.");
 	array_mesh->surface_set_material(0, mat);
 	state.p_root->add_child(mi);
 	mi->set_owner(state.p_root);
