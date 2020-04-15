@@ -228,6 +228,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 	EditorProgress progress_scene_merge("gen_get_source_material", TTR("Get source material"), state.material_cache.size());
 	int step = 0;
 	for (int32_t material_cache_i = 0; material_cache_i < state.material_cache.size(); material_cache_i++) {
+		step++;
 		Ref<SpatialMaterial> material = state.material_cache[material_cache_i];
 		if (material.is_null()) {
 			continue;
@@ -304,7 +305,6 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 		cache.emission_img = _get_source_texture(state, material, "emission");
 		state.material_image_cache[material_cache_i] = cache;	
 		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
-		step++;
 	}
 	_generate_texture_atlas(state, "albedo");
 	_generate_texture_atlas(state, "emission");
@@ -324,11 +324,10 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	atlas_img->create(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
 	// Rasterize chart triangles.	
 
-	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Mesh Atlas"), state.atlas->meshCount);
-
+	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Atlas"), state.atlas->meshCount);
+	int step = 0;
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];	
-		int step = 0;
 		for (uint32_t chart_i = 0; chart_i < mesh.chartCount; chart_i++) {
 			const xatlas::Chart &chart = mesh.chartArray[chart_i];
 			Ref<Image> img;
@@ -366,9 +365,9 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				args.sourceTexture->unlock();
 				args.atlasData->unlock();
 			}
-			progress_texture_atlas.step(TTR("Processing Chart for Atlas: ") + texture_type + " (" + itos(step) + "/" + itos(mesh.chartCount) + ")", step);
-			step++;
 		}
+		progress_texture_atlas.step(TTR("Process Mesh for Atlas: ") + texture_type + " (" + itos(step) + "/" + itos(state.atlas->meshCount) + ")", step);
+		step++;
 	}
 	state.texture_atlas.insert(texture_type, atlas_img);
 }
