@@ -86,9 +86,9 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 		// Interpolate source UVs using barycentrics.
 		const Vector2 sourceUv = args->source_uvs[0] * bar.x + args->source_uvs[1] * bar.y + args->source_uvs[2] * bar.z;
 		// Keep coordinates in range of texture dimensions.
-		int _width = args->sourceTexture->get_width();
+		int _width = args->sourceTexture->get_width() - 1;
 		float sx = sourceUv.x * _width;
-		int _height = args->sourceTexture->get_height();
+		int _height = args->sourceTexture->get_height() -1;
 		float sy = sourceUv.y * _height;
 		const Color color = args->sourceTexture->get_pixel(sx, sy);
 		args->atlasData->set_pixel(x, y, color);
