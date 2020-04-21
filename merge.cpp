@@ -88,8 +88,20 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 		// Keep coordinates in range of texture dimensions.
 		int _width = args->sourceTexture->get_width() - 1;
 		float sx = sourceUv.x * _width;
-		int _height = args->sourceTexture->get_height() -1;
+		while (sx < 0) {
+			sx += _width;
+		}
+		if ((int32_t)sx > _width) {
+			sx = Math::fmod(sx, _width);
+		}
+		int _height = args->sourceTexture->get_height() - 1;
 		float sy = sourceUv.y * _height;
+		while (sy < 0) {
+			sy += _height;
+		}
+		if ((int32_t)sy > _height) {
+			sy = Math::fmod(sy, _height);
+		}
 		const Color color = args->sourceTexture->get_pixel(sx, sy);
 		args->atlasData->set_pixel(x, y, color);
 		AtlasLookupTexel &lookup = args->atlas_lookup[x * y + args->atlas_width];
@@ -109,19 +121,10 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshState> &r_item
 			bool has_blends = false;
 			bool has_bones = false;
 			bool has_transparency = false;
-			bool has_oversized_uvs = false;
 			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 
 				Array array = array_mesh->surface_get_arrays(surface_i);
 				Array bones = array[ArrayMesh::ARRAY_BONES];
-				Array uvs = array[ArrayMesh::ARRAY_TEX_UV];
-				for (int32_t uv_i = 0; uv_i < uvs.size(); uv_i++) {
-					Vector2 uv = uvs[uv_i];
-					if (uv.x < 0.0f || uv.x > 1.0f || uv.y < 0.0f || uv.y > 1.0f) {
-						has_oversized_uvs |= true;
-						break;
-					}
-				}
 				has_bones |= bones.size() != 0;
 				has_blends |= array_mesh->get_blend_shape_count() != 0;
 				Ref<SpatialMaterial> spatial_mat = array_mesh->surface_get_material(surface_i);
@@ -129,22 +132,15 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshState> &r_item
 					Ref<Image> albedo_img = spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
 					has_transparency |= spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) || spatial_mat->get_flag(SpatialMaterial::FLAG_USE_ALPHA_SCISSOR);
 				}
-				if (has_blends || has_bones || has_transparency || has_oversized_uvs) {
+				if (has_blends || has_bones || has_transparency) {
 					break;
 				}
 			}
-			if (!has_blends && !has_bones && !has_transparency && !has_oversized_uvs) {
+			if (!has_blends && !has_bones && !has_transparency) {
 				for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 					Array array = array_mesh->surface_get_arrays(surface_i);
 					Array bones = array[ArrayMesh::ARRAY_BONES];
 					Array uvs = array[ArrayMesh::ARRAY_TEX_UV];
-					for (int32_t uv_i = 0; uv_i < uvs.size(); uv_i++) {
-						Vector2 uv = uvs[uv_i];
-						if (uv.x < 0.0f || uv.x > 1.0f || uv.y < 0.0f || uv.y > 1.0f) {
-							has_oversized_uvs |= true;
-							break;
-						}
-					}
 					has_bones |= bones.size() != 0;
 					has_blends |= array_mesh->get_blend_shape_count() != 0;
 					Ref<SpatialMaterial> spatial_mat = array_mesh->surface_get_material(surface_i);
@@ -152,7 +148,7 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshState> &r_item
 						Ref<Image> albedo_img = spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
 						has_transparency |= spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) || spatial_mat->get_flag(SpatialMaterial::FLAG_USE_ALPHA_SCISSOR);
 					}
-					if (!has_blends && !has_bones && !has_transparency && !has_oversized_uvs) {
+					if (!has_blends && !has_bones && !has_transparency) {
 						MeshState mesh_state;
 						Ref<SurfaceTool> st;
 						st.instance();
