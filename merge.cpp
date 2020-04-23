@@ -310,7 +310,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 			Ref<Image> img;
 			img.instance();
 			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
-			float metallic = 1.0f;
+			float metallic = material->get_metallic();
 			Color c = Color(metallic, metallic, metallic);
 			material->set_metallic(1.0f);
 			img->fill(c);
