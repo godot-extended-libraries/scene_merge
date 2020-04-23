@@ -304,6 +304,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
+			material->set_roughness_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_GREEN);
 			material->set_texture(SpatialMaterial::TEXTURE_ROUGHNESS, tex);
 		}
 		if (material->get_texture(SpatialMaterial::TEXTURE_METALLIC).is_null()) {
@@ -317,7 +318,21 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
+			material->set_metallic_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_GREEN);
 			material->set_texture(SpatialMaterial::TEXTURE_METALLIC, tex);
+		}
+		if (material->get_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION).is_null()) {
+			Ref<Image> img;
+			img.instance();
+			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+			float ao = 1.0f;
+			Color c = Color(ao, ao, ao);
+			img->fill(c);
+			Ref<ImageTexture> tex;
+			tex.instance();
+			tex->create_from_image(img);
+			material->set_ao_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_GREEN);
+			material->set_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION, tex);
 		}
 		MaterialImageCache cache;
 		cache.albedo_img = _get_source_texture(state, material, "albedo");
