@@ -701,7 +701,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 			r_model_vertices.push_back(Vector<ModelVertex>());
 		}
 	}
-	uint32_t mesh_count = 0;
+	int32_t mesh_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		for (int32_t surface_i = 0; surface_i < mesh_items[mesh_i].mesh->get_surface_count(); surface_i++) {
 			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
@@ -751,7 +751,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 			Vector<Vector2> uvs;
 			uvs.resize(vertices.size());
 			Vector<int32_t> indices = mesh[ArrayMesh::ARRAY_INDEX];
-			for (uint32_t vertex_i = 0; vertex_i < vertices.size(); vertex_i++) {
+			for (int32_t vertex_i = 0; vertex_i < vertices.size(); vertex_i++) {
 				if (mesh_count >= r_mesh_to_index_to_material.size()) {
 					uvs.resize(0);
 					break;
