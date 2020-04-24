@@ -71,8 +71,6 @@ private:
 	GDCLASS(SceneMerge, Reference);
 
 	void _dialog_action(String p_file);
-	void _node_replace_owner(Node *p_base, Node *p_node, Node *p_root);
-
 public:
 	void merge(const String p_file, Node *p_root_node);
 };

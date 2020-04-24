@@ -58,21 +58,10 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include "merge.h"
 
-void SceneMerge::_node_replace_owner(Node *p_base, Node *p_node, Node *p_root) {
-
-	p_node->set_owner(p_root);
-	p_node->set_filename("");
-
-	for (int child_i = 0; child_i < p_node->get_child_count(); child_i++) {
-		_node_replace_owner(p_base, p_node->get_child(child_i), p_root);
-	}
-}
-
 void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	PackedScene *scene = memnew(PackedScene);
 	scene->pack(p_root_node);
 	Node *root = scene->instance();
-	_node_replace_owner(root, root, root);
 	Ref<MeshMergeMaterialRepack> repack;
 	repack.instance();
 	root = repack->merge(root, p_root_node);
