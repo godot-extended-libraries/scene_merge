@@ -784,7 +784,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 			Vector<Plane> tangent_arr = mesh[Mesh::ARRAY_TANGENT];
 			Vector<ModelVertex> model_vertices;
 			model_vertices.resize(vertex_arr.size());
-
+			Transform xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();				
 			Ref<Skin> skin = mesh_items[mesh_i].skin;
 
 			MeshInstance *mi = original_mesh_items[mesh_i].mesh_instance;
@@ -792,10 +792,6 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 			Skeleton *skeleton = Object::cast_to<Skeleton>(node);
 			for (int32_t vertex_i = 0; vertex_i < vertex_arr.size(); vertex_i++) {
 				ModelVertex vertex;
-				Transform xform;
-				if (!original_mesh_items[mesh_i].has_bones) {
-					xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();
-				}
 				vertex.pos = xform.xform(vertex_arr[vertex_i]);
 				Vector<int> bones;
 				bones.resize(4);
@@ -1087,12 +1083,12 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 	mi->set_transform(root_xform.affine_inverse());
 	array_mesh->surface_set_material(0, mat);
 	if (skeleton) {
-		skeleton->add_child(mi);
-		mi->set_owner(state.p_root);
-	} else {
-		state.p_root->add_child(mi);
-		mi->set_owner(state.p_root);
+		NodePath root_path = state.p_root->get_path_to(skeleton);
+		NodePath mi_path = mi->get_path_to(state.p_root);
+		mi->set_skeleton_path(".." + String(mi_path) + "/" + root_path);
 	}
+	state.p_root->add_child(mi);
+	mi->set_owner(state.p_root);
 	return state.p_root;
 }
 
