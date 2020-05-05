@@ -419,29 +419,16 @@ private:
 		Vector3 pos;
 		Vector3 normal;
 		Vector2 uv;
-		Vector<int> bones;
-		Vector<float> weights;
-		ModelVertex() {
-			bones.resize(4);
-			weights.resize(4);
-		}
 	};
 	struct MeshState {		
 		Ref<Mesh> mesh;
 		NodePath path;
 		MeshInstance * mesh_instance;
-		bool has_bones = true;
-		Ref<Skin> skin;
 		bool operator==(const MeshState& rhs) const {
-			if (rhs.mesh == mesh
-			&& rhs.path == path 
-			&& rhs.mesh_instance == mesh_instance 
-			&& rhs.has_bones == has_bones
-			&& rhs.skin == skin) {
+			if (rhs.mesh == mesh && rhs.path == path && rhs.mesh_instance == mesh_instance) {
 				return true;
 			}
 			return false;
-			
 		}
 	};
 
@@ -467,18 +454,10 @@ private:
 		Map<String, Ref<Image> > texture_atlas;
 		Map<int32_t, MaterialImageCache> material_image_cache;
 	};
-	struct MergeMeshState {
-		Vector<MeshState> mesh_items;
-		Vector<MeshState> original_mesh_items;
-		Node *root = nullptr;
-	};
 	Ref<Image> dilate(Ref<Image> source_image);
 	const int32_t texture_minimum_side = 512;
-
 public:
-	Node *merge_mesh_group(MergeMeshState &state, Node *p_root);
 	Node *merge(Node *p_root, Node *p_original_root);
-	Node *merge_meshes(Vector<MeshMergeMaterialRepack::MeshState> &mesh_items, Vector<MeshMergeMaterialRepack::MeshState> &original_mesh_items, Node *&p_root, bool &retflag);
 	void _generate_texture_atlas(MergeState &state, String texture_type);
 	Ref<Image> _get_source_texture(MergeState &state, Ref<SpatialMaterial> material, String texture_type);
 	void _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,

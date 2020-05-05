@@ -108,33 +108,36 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshState> &r_item
 		Ref<ArrayMesh> array_mesh = mi->get_mesh();
 		if (array_mesh.is_valid()) {
 			bool has_blends = false;
+			bool has_bones = false;
 			bool has_transparency = false;
 			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 
 				Array array = array_mesh->surface_get_arrays(surface_i);
+				Array bones = array[ArrayMesh::ARRAY_BONES];
+				has_bones |= bones.size() != 0;
 				has_blends |= array_mesh->get_blend_shape_count() != 0;
 				Ref<SpatialMaterial> spatial_mat = array_mesh->surface_get_material(surface_i);
 				if (spatial_mat.is_valid()) {
 					Ref<Image> albedo_img = spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
 					has_transparency |= spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) || spatial_mat->get_flag(SpatialMaterial::FLAG_USE_ALPHA_SCISSOR);
 				}
-				if (has_blends || has_transparency) {
+				if (has_blends || has_bones || has_transparency) {
 					break;
 				}
 			}
-			if (!has_blends && !has_transparency) {
+			if (!has_blends && !has_bones && !has_transparency) {
 				for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 					Array array = array_mesh->surface_get_arrays(surface_i);
+					Array bones = array[ArrayMesh::ARRAY_BONES];
 					Array uvs = array[ArrayMesh::ARRAY_TEX_UV];
+					has_bones |= bones.size() != 0;
 					has_blends |= array_mesh->get_blend_shape_count() != 0;
-					Vector<int32_t> bones = array[ArrayMesh::ARRAY_BONES];
-					bool has_bones = bones.size() != 0;
 					Ref<SpatialMaterial> spatial_mat = array_mesh->surface_get_material(surface_i);
 					if (spatial_mat.is_valid()) {
 						Ref<Image> albedo_img = spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
 						has_transparency |= spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) || spatial_mat->get_flag(SpatialMaterial::FLAG_USE_ALPHA_SCISSOR);
 					}
-					if (!has_blends && !has_transparency) {
+					if (!has_blends && !has_bones && !has_transparency) {
 						MeshState mesh_state;
 						Ref<SurfaceTool> st;
 						st.instance();
@@ -142,18 +145,6 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshState> &r_item
 						Ref<ArrayMesh> split_mesh = st->commit();
 						split_mesh->surface_set_material(0, array_mesh->surface_get_material(surface_i));
 						mesh_state.mesh = split_mesh;
-						mesh_state.has_bones = has_bones;
-						mesh_state.skin = mi->get_skin();
-						if (mi->get_skin().is_null()) {
-							Node *node = mi->get_node(mi->get_skeleton_path());
-							Skeleton *skeleton = Object::cast_to<Skeleton>(node);
-							Ref<Skin> skin;
-							skin.instance();
-							if (skeleton) {
-								Ref<SkinReference> ref = skeleton->register_skin(skin);
-								mesh_state.skin = ref->get_skin();
-							}
-						}
 						if (mi->is_inside_tree()) {
 							mesh_state.path = mi->get_path();
 						}
@@ -210,58 +201,6 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 	if (!original_mesh_items.size()) {
 		return p_root;
 	}
-
-	MergeMeshState state;
-	{
-		state.root = p_root;
-		Vector<MeshState> skeleton_items = mesh_items;
-		Vector<MeshState> original_skeleton_items = original_mesh_items;
-		for (int32_t i = 0; i < skeleton_items.size(); i++) {
-			if (!skeleton_items[i].has_bones) {
-				skeleton_items.erase(skeleton_items[i]);
-			}
-		}
-		state.mesh_items = skeleton_items;
-		for (int32_t i = 0; i < original_skeleton_items.size(); i++) {
-			if (!original_skeleton_items[i].has_bones) {
-				original_skeleton_items.erase(original_skeleton_items[i]);
-			}
-		}
-		state.original_mesh_items = original_skeleton_items;
-		p_root = merge_mesh_group(state, p_root);
-	}
-	{
-		state.root = p_root;
-		Vector<MeshState> current_items = mesh_items;
-		Vector<MeshState> original_items = original_mesh_items;
-		for (int32_t i = 0; i < current_items.size(); i++) {
-			if (current_items[i].has_bones) {
-				current_items.erase(current_items[i]);
-			}
-		}
-		state.mesh_items = current_items;
-		for (int32_t i = 0; i < original_items.size(); i++) {
-			if (original_items[i].has_bones) {
-				original_items.erase(original_items[i]);
-			}
-		}
-		state.original_mesh_items = original_items;
-		p_root = merge_mesh_group(state, p_root);
-	}
-	return p_root;
-}
-
-Node *MeshMergeMaterialRepack::merge_mesh_group(MergeMeshState &state, Node *p_root) {
-	bool retflag;
-	Node *retval = merge_meshes(state.mesh_items, state.original_mesh_items, state.root, retflag);
-	if (retflag) {
-		return retval;
-	}
-	return p_root;
-}
-
-Node *MeshMergeMaterialRepack::merge_meshes(Vector<MeshMergeMaterialRepack::MeshState> &mesh_items, Vector<MeshMergeMaterialRepack::MeshState> &original_mesh_items, Node *&p_root, bool &retflag) {
-	retflag = true;
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
 	Ref<Material> empty_material;
@@ -276,7 +215,7 @@ Node *MeshMergeMaterialRepack::merge_meshes(Vector<MeshMergeMaterialRepack::Mesh
 
 	int32_t num_surfaces = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		for (int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
+		for(int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
 			Array mesh = mesh_items[mesh_i].mesh->surface_get_arrays(j);
 			if (mesh.empty()) {
 				continue;
@@ -389,7 +328,7 @@ Node *MeshMergeMaterialRepack::merge_meshes(Vector<MeshMergeMaterialRepack::Mesh
 		cache.normal_img = _get_source_texture(state, material, "normal");
 		cache.orm_img = _get_source_texture(state, material, "orm");
 		cache.emission_img = _get_source_texture(state, material, "emission");
-		state.material_image_cache[material_cache_i] = cache;
+		state.material_image_cache[material_cache_i] = cache;	
 		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
 	}
 	_generate_texture_atlas(state, "albedo");
@@ -401,20 +340,19 @@ Node *MeshMergeMaterialRepack::merge_meshes(Vector<MeshMergeMaterialRepack::Mesh
 	p_root = _output(state);
 
 	xatlas::Destroy(atlas);
-	retflag = false;
-	return {};
+	return p_root;
 }
 
 void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String texture_type) {
 	Ref<Image> atlas_img;
 	atlas_img.instance();
 	atlas_img->create(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
-	// Rasterize chart triangles.
+	// Rasterize chart triangles.	
 
 	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Atlas"), state.atlas->meshCount);
 	int step = 0;
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
-		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
+		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];	
 		for (uint32_t chart_i = 0; chart_i < mesh.chartCount; chart_i++) {
 			const xatlas::Chart &chart = mesh.chartArray[chart_i];
 			Ref<Image> img;
@@ -767,7 +705,6 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		for (int32_t surface_i = 0; surface_i < mesh_items[mesh_i].mesh->get_surface_count(); surface_i++) {
 			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
-			Ref<Skin> skin = mesh_items[mesh_i].skin;
 			Array mesh = array_mesh->surface_get_arrays(surface_i);
 			if (mesh.empty()) {
 				continue;
@@ -778,88 +715,24 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 			}
 			Vector<Vector3> vertex_arr = mesh[Mesh::ARRAY_VERTEX];
 			Vector<Vector3> normal_arr = mesh[Mesh::ARRAY_NORMAL];
-			PoolVector<int32_t> bones_arr = mesh[Mesh::ARRAY_BONES];
-			PoolVector<float> weights_arr = mesh[Mesh::ARRAY_WEIGHTS];
 			Vector<Vector2> uv_arr = mesh[Mesh::ARRAY_TEX_UV];
 			Vector<int32_t> index_arr = mesh[Mesh::ARRAY_INDEX];
 			Vector<Plane> tangent_arr = mesh[Mesh::ARRAY_TANGENT];
+			Transform xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();
 			Vector<ModelVertex> model_vertices;
 			model_vertices.resize(vertex_arr.size());
-			Transform xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();
-
-			MeshInstance *mi = mesh_items[mesh_i].mesh_instance;
-			Node *node = mi->get_node(original_mesh_items[mesh_i].mesh_instance->get_skeleton_path());
-			Skeleton *skeleton = Object::cast_to<Skeleton>(node);
-			Ref<Skin> new_skin;
-			new_skin.instance();
-			Set<String> binds;
 			for (int32_t vertex_i = 0; vertex_i < vertex_arr.size(); vertex_i++) {
 				ModelVertex vertex;
 				vertex.pos = xform.xform(vertex_arr[vertex_i]);
-				Vector<int> bones;
-				bones.resize(4);
-				if (bones_arr.size()) {
-					bones.write[0] = bones_arr[vertex_i * 4 + 0];
-					bones.write[1] = bones_arr[vertex_i * 4 + 1];
-					bones.write[2] = bones_arr[vertex_i * 4 + 2];
-					bones.write[3] = bones_arr[vertex_i * 4 + 3];
-				}
-				vertex.bones = bones;
-				Vector<float> weights;
-				weights.resize(4);
-				if (weights_arr.size() && bones_arr.size()) {
-					weights.write[0] = weights_arr[vertex_i * 4 + 0];
-					weights.write[1] = weights_arr[vertex_i * 4 + 1];
-					weights.write[2] = weights_arr[vertex_i * 4 + 2];
-					weights.write[3] = weights_arr[vertex_i * 4 + 3];
-					Transform rest_0 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 0]);
-					Transform xform_0 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 0]);
-					if (!xform_0.is_equal_approx(rest_0)) {
-						String bind = skeleton->get_bone_name(bones_arr[vertex_i * 4 + 0]);
-						if (!binds.has(bind)) {
-							new_skin->add_named_bind(bind, xform_0);
-							binds.insert(bind);
-						}
-					}
-					Transform rest_1 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 1]);
-					Transform xform_1 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 1]);
-					if (!xform_1.is_equal_approx(rest_1)) {
-						String bind = skeleton->get_bone_name(bones_arr[vertex_i * 4 + 0]);
-						if (!binds.has(bind)) {
-							new_skin->add_named_bind(bind, xform_1);
-							binds.insert(bind);
-						}
-					}
-					Transform rest_2 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 2]);
-					Transform xform_2 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 2]);
-					if (!xform_2.is_equal_approx(rest_2)) {
-						String bind = skeleton->get_bone_name(bones_arr[vertex_i * 4 + 0]);
-						if (!binds.has(bind)) {
-							new_skin->add_named_bind(bind, xform_2);
-							binds.insert(bind);
-						}
-					}
-					Transform rest_3 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 3]);
-					Transform xform_3 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 3]);
-					if (!xform_3.is_equal_approx(rest_3)) {
-						String bind = skeleton->get_bone_name(bones_arr[vertex_i * 4 + 0]);
-						if (!binds.has(bind)) {
-							new_skin->add_named_bind(bind, xform_3);
-							binds.insert(bind);
-						}
-					}
-				}
 				if (normal_arr.size()) {
 					Vector3 normal = normal_arr[vertex_i];
 					vertex.normal = xform.basis.xform(normal).normalized();
 				}
-				vertex.weights = weights;
 				if (uv_arr.size()) {
 					vertex.uv = uv_arr[vertex_i];
 				}
 				model_vertices.write[vertex_i] = vertex;
 			}
-			mesh_items.write[mesh_i].skin = new_skin;
 			r_model_vertices.write[mesh_count] = model_vertices;
 			mesh_count++;
 		}
@@ -907,7 +780,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 					uvs.write[vertex_i].x *= (float)MAX(texture_minimum_side, tex->get_width());
 					uvs.write[vertex_i].y *= (float)MAX(texture_minimum_side, tex->get_height());
 				}
-			}
+			}			
 			uv_groups.push_back(uvs);
 			mesh_count++;
 		}
@@ -964,7 +837,7 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshSta
 				break;
 			}
 		}
-		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
+		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {			
 			Array mesh = array_mesh->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
 			Ref<Material> mat = mesh_items[mesh_i].mesh->surface_get_material(j);
@@ -986,14 +859,7 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshSta
 
 Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 	MeshMergeMaterialRepack::TextureData texture_data;
-	Node *skeleton = nullptr;
-	Ref<Skin> skin;
 	for (int32_t mesh_i = 0; mesh_i < state.r_mesh_items.size(); mesh_i++) {
-		NodePath path = state.r_mesh_items[mesh_i].mesh_instance->get_skeleton_path();
-		if (state.r_mesh_items[mesh_i].has_bones) {
-			skeleton = state.r_mesh_items[mesh_i].mesh_instance->get_node(path);
-			skin = state.r_mesh_items[mesh_i].skin;
-		}
 		if (state.r_mesh_items[mesh_i].mesh_instance->get_parent()) {
 			Spatial *spatial = memnew(Spatial);
 			Transform xform = state.r_mesh_items[mesh_i].mesh_instance->get_transform();
@@ -1016,8 +882,6 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			st->add_uv(Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height));
 			st->add_normal(sourceVertex.normal);
 			st->add_color(Color(1.0f, 1.0f, 1.0f));
-			st->add_bones(sourceVertex.bones);
-			st->add_weights(sourceVertex.weights);
 			st->add_vertex(sourceVertex.pos);
 		}
 		for (uint32_t f = 0; f < mesh.indexCount; f++) {
@@ -1103,12 +967,6 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 	}
 	mi->set_transform(root_xform.affine_inverse());
 	array_mesh->surface_set_material(0, mat);
-	if (skeleton) {
-		NodePath root_path = state.p_root->get_path_to(skeleton);
-		NodePath mi_path = mi->get_path_to(state.p_root);
-		mi->set_skeleton_path(".." + String(mi_path) + "/" + root_path);
-		mi->set_skin(skin);
-	}
 	state.p_root->add_child(mi);
 	mi->set_owner(state.p_root);
 	return state.p_root;
@@ -1133,7 +991,7 @@ void SceneMergePlugin::merge(Variant p_user_data) {
 		file_export_lib->add_filter("*." + extensions[extension_i] + " ; " + extensions[extension_i].to_upper());
 	}
 	file_export_lib->popup_centered_ratio();
-	file_export_lib->set_title(TTR("Merge Scene"));
+	file_export_lib->set_title(TTR("Merge Scene"));	
 	Node *root = editor->get_tree()->get_edited_scene_root();
 	String filename = String(root->get_filename().get_file().get_basename());
 	if (filename.empty()) {
