@@ -767,6 +767,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		for (int32_t surface_i = 0; surface_i < mesh_items[mesh_i].mesh->get_surface_count(); surface_i++) {
 			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
+			Ref<Skin> skin = mesh_items[mesh_i].skin;
 			Array mesh = array_mesh->surface_get_arrays(surface_i);
 			if (mesh.empty()) {
 				continue;
@@ -784,12 +785,14 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 			Vector<Plane> tangent_arr = mesh[Mesh::ARRAY_TANGENT];
 			Vector<ModelVertex> model_vertices;
 			model_vertices.resize(vertex_arr.size());
-			Transform xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();				
-			Ref<Skin> skin = mesh_items[mesh_i].skin;
+			Transform xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();
 
-			MeshInstance *mi = original_mesh_items[mesh_i].mesh_instance;
+			MeshInstance *mi = mesh_items[mesh_i].mesh_instance;
 			Node *node = mi->get_node(original_mesh_items[mesh_i].mesh_instance->get_skeleton_path());
 			Skeleton *skeleton = Object::cast_to<Skeleton>(node);
+			Ref<Skin> new_skin;
+			new_skin.instance();
+			Set<String> binds;
 			for (int32_t vertex_i = 0; vertex_i < vertex_arr.size(); vertex_i++) {
 				ModelVertex vertex;
 				vertex.pos = xform.xform(vertex_arr[vertex_i]);
@@ -809,27 +812,42 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 					weights.write[1] = weights_arr[vertex_i * 4 + 1];
 					weights.write[2] = weights_arr[vertex_i * 4 + 2];
 					weights.write[3] = weights_arr[vertex_i * 4 + 3];
-					// Transform rest_0 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 0]);
-					// rest_0 = Transform().interpolate_with(rest_0, weights[0]);
-					// Transform rest_1 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 1]);
-					// rest_1 = Transform().interpolate_with(rest_1, weights[1]);
-					// Transform rest_2 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 2]);
-					// rest_2 = Transform().interpolate_with(rest_2, weights[2]);
-					// Transform rest_3 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 3]);
-					// rest_3 = Transform().interpolate_with(rest_3, weights[3]);
-					// Transform rest_xform = rest_3 * rest_2 * rest_1 * rest_0;
-					// rest_xform = rest_xform.affine_inverse();
-
-					// Transform xform_0 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 0]);
-					// xform_0 = Transform().interpolate_with(xform_0, weights[0]);
-					// Transform xform_1 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 1]);
-					// xform_1 = Transform().interpolate_with(xform_1, weights[1]);
-					// Transform xform_2 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 2]);
-					// xform_2 = Transform().interpolate_with(xform_2, weights[2]);
-					// Transform xform_3 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 3]);
-					// xform_3 = Transform().interpolate_with(xform_3, weights[3]);
-					// Transform bind_xform = xform_3 * xform_2 * xform_1 * xform_0;
-					// vertex.pos = bind_xform.xform(vertex.pos);
+					Transform rest_0 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 0]);
+					Transform xform_0 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 0]);
+					if (!xform_0.is_equal_approx(rest_0)) {
+						String bind = skeleton->get_bone_name(bones_arr[vertex_i * 4 + 0]);
+						if (!binds.has(bind)) {
+							new_skin->add_named_bind(bind, xform_0);
+							binds.insert(bind);
+						}
+					}
+					Transform rest_1 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 1]);
+					Transform xform_1 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 1]);
+					if (!xform_1.is_equal_approx(rest_1)) {
+						String bind = skeleton->get_bone_name(bones_arr[vertex_i * 4 + 0]);
+						if (!binds.has(bind)) {
+							new_skin->add_named_bind(bind, xform_1);
+							binds.insert(bind);
+						}
+					}
+					Transform rest_2 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 2]);
+					Transform xform_2 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 2]);
+					if (!xform_2.is_equal_approx(rest_2)) {
+						String bind = skeleton->get_bone_name(bones_arr[vertex_i * 4 + 0]);
+						if (!binds.has(bind)) {
+							new_skin->add_named_bind(bind, xform_2);
+							binds.insert(bind);
+						}
+					}
+					Transform rest_3 = skeleton->get_bone_rest(bones_arr[vertex_i * 4 + 3]);
+					Transform xform_3 = skin->get_bind_pose(bones_arr[vertex_i * 4 + 3]);
+					if (!xform_3.is_equal_approx(rest_3)) {
+						String bind = skeleton->get_bone_name(bones_arr[vertex_i * 4 + 0]);
+						if (!binds.has(bind)) {
+							new_skin->add_named_bind(bind, xform_3);
+							binds.insert(bind);
+						}
+					}
 				}
 				if (normal_arr.size()) {
 					Vector3 normal = normal_arr[vertex_i];
@@ -841,6 +859,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 				}
 				model_vertices.write[vertex_i] = vertex;
 			}
+			mesh_items.write[mesh_i].skin = new_skin;
 			r_model_vertices.write[mesh_count] = model_vertices;
 			mesh_count++;
 		}
@@ -968,10 +987,12 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshSta
 Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 	MeshMergeMaterialRepack::TextureData texture_data;
 	Node *skeleton = nullptr;
+	Ref<Skin> skin;
 	for (int32_t mesh_i = 0; mesh_i < state.r_mesh_items.size(); mesh_i++) {
 		NodePath path = state.r_mesh_items[mesh_i].mesh_instance->get_skeleton_path();
 		if (state.r_mesh_items[mesh_i].has_bones) {
 			skeleton = state.r_mesh_items[mesh_i].mesh_instance->get_node(path);
+			skin = state.r_mesh_items[mesh_i].skin;
 		}
 		if (state.r_mesh_items[mesh_i].mesh_instance->get_parent()) {
 			Spatial *spatial = memnew(Spatial);
@@ -1086,6 +1107,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 		NodePath root_path = state.p_root->get_path_to(skeleton);
 		NodePath mi_path = mi->get_path_to(state.p_root);
 		mi->set_skeleton_path(".." + String(mi_path) + "/" + root_path);
+		mi->set_skin(skin);
 	}
 	state.p_root->add_child(mi);
 	mi->set_owner(state.p_root);
