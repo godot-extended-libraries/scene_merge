@@ -347,12 +347,12 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	Ref<Image> atlas_img;
 	atlas_img.instance();
 	atlas_img->create(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
-	// Rasterize chart triangles.	
+	// Rasterize chart triangles.
 
 	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Atlas"), state.atlas->meshCount);
 	int step = 0;
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
-		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];	
+		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
 		for (uint32_t chart_i = 0; chart_i < mesh.chartCount; chart_i++) {
 			const xatlas::Chart &chart = mesh.chartArray[chart_i];
 			Ref<Image> img;
@@ -780,7 +780,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 					uvs.write[vertex_i].x *= (float)MAX(texture_minimum_side, tex->get_width());
 					uvs.write[vertex_i].y *= (float)MAX(texture_minimum_side, tex->get_height());
 				}
-			}			
+			}
 			uv_groups.push_back(uvs);
 			mesh_count++;
 		}
@@ -991,7 +991,7 @@ void SceneMergePlugin::merge(Variant p_user_data) {
 		file_export_lib->add_filter("*." + extensions[extension_i] + " ; " + extensions[extension_i].to_upper());
 	}
 	file_export_lib->popup_centered_ratio();
-	file_export_lib->set_title(TTR("Merge Scene"));	
+	file_export_lib->set_title(TTR("Merge Scene"));
 	Node *root = editor->get_tree()->get_edited_scene_root();
 	String filename = String(root->get_filename().get_file().get_basename());
 	if (filename.empty()) {
