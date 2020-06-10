@@ -685,8 +685,9 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 		}
 	}
 	pack_options.bilinear = false;
-	pack_options.padding = 64;
-	pack_options.texelsPerUnit = 8096.0f / 1024.0f * 0.1f;
+	pack_options.padding = 16;
+	pack_options.maxChartSize = 2048;
+	pack_options.texelsPerUnit = pack_options.maxChartSize / 1024.0f * 0.1f;
 	pack_options.blockAlign = true;
 	xatlas::PackCharts(atlas, pack_options);
 }
