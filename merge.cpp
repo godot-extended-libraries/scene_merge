@@ -928,8 +928,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			if (has_normals) {
 				Ref<ImageTexture> texture;
 				texture.instance();
-				Ref<Image> img = dilate(N->get());
-				texture->create_from_image(img);
+				texture->create_from_image(N->get());
 				texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
 				mat->set_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING, true);
 				mat->set_texture(SpatialMaterial::TEXTURE_NORMAL, texture);
