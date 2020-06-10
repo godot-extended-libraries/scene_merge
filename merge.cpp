@@ -652,9 +652,6 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 				continue;
 			}
 			Array indices = mesh[ArrayMesh::ARRAY_INDEX];
-			if (indices.empty()) {
-				continue;
-			}
 			xatlas::UvMeshDecl meshDecl;
 			meshDecl.vertexCount = r_uvs[mesh_count].size();
 			meshDecl.vertexUvData = r_uvs[mesh_count].ptr();
