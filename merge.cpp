@@ -210,7 +210,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 	Vector<Vector<Vector2> > uv_groups;
 	Vector<Vector<ModelVertex> > model_vertices;
 	scale_uvs_by_texture_dimension(original_mesh_items, mesh_items, uv_groups, mesh_to_index_to_material, model_vertices);
-	xatlas::SetPrint(printf, false);
+	xatlas::SetPrint(printf, true);
 	xatlas::Atlas *atlas = xatlas::Create();
 
 	int32_t num_surfaces = 0;
@@ -688,9 +688,8 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 		}
 	}
 	pack_options.bilinear = false;
-	pack_options.padding = 32;
-	pack_options.texelsPerUnit = 1.0f;
-	pack_options.maxChartSize = 2048;
+	pack_options.padding = 64;
+	pack_options.texelsPerUnit = 8096.0f / 1024.0f * 0.1f;
 	pack_options.blockAlign = true;
 	xatlas::PackCharts(atlas, pack_options);
 }
