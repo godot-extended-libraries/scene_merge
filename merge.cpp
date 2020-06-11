@@ -75,20 +75,20 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 		// Interpolate source UVs using barycentrics.
 		const Vector2 sourceUv = args->source_uvs[0] * bar.x + args->source_uvs[1] * bar.y + args->source_uvs[2] * bar.z;
 		// Keep coordinates in range of texture dimensions.
-		int _width = args->sourceTexture->get_width() - 1;
+		int _width = args->sourceTexture->get_width();
 		float sx = sourceUv.x * _width;
-		while (sx < 0) {
+		while (sx < 0.0f) {
 			sx += _width;
 		}
-		if ((int32_t)sx > _width) {
+		if (sx > _width) {
 			sx = Math::fmod(sx, _width);
 		}
-		int _height = args->sourceTexture->get_height() - 1;
+		int _height = args->sourceTexture->get_height();
 		float sy = sourceUv.y * _height;
-		while (sy < 0) {
+		while (sy < 0.0f) {
 			sy += _height;
 		}
-		if ((int32_t)sy > _height) {
+		if (sy > _height) {
 			sy = Math::fmod(sy, _height);
 		}
 		const Color color = args->sourceTexture->get_pixel(sx, sy);
@@ -215,7 +215,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 
 	int32_t num_surfaces = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		for(int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
+		for (int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
 			Array mesh = mesh_items[mesh_i].mesh->surface_get_arrays(j);
 			if (mesh.empty()) {
 				continue;
@@ -323,12 +323,24 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 			material->set_ao_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_GREEN);
 			material->set_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION, tex);
 		}
+		if (!material->get_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING)) {
+			Ref<Image> img;
+			img.instance();
+			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+			Color c = Color(0.5f, 0.5f, 0.0f);
+			img->fill(c);
+			Ref<ImageTexture> tex;
+			tex.instance();
+			tex->create_from_image(img);
+			material->set_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING, true);
+			material->set_texture(SpatialMaterial::TEXTURE_NORMAL, tex);
+		}
 		MaterialImageCache cache;
 		cache.albedo_img = _get_source_texture(state, material, "albedo");
 		cache.normal_img = _get_source_texture(state, material, "normal");
 		cache.orm_img = _get_source_texture(state, material, "orm");
 		cache.emission_img = _get_source_texture(state, material, "emission");
-		state.material_image_cache[material_cache_i] = cache;	
+		state.material_image_cache[material_cache_i] = cache;
 		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
 	}
 	_generate_texture_atlas(state, "albedo");
@@ -685,7 +697,7 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 		}
 	}
 	pack_options.bilinear = false;
-	pack_options.padding = 16;
+	pack_options.padding = 32;
 	pack_options.texelsPerUnit = 0.8f;
 	pack_options.blockAlign = true;
 	xatlas::PackCharts(atlas, pack_options);
@@ -833,7 +845,7 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshSta
 				break;
 			}
 		}
-		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {			
+		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
 			Array mesh = array_mesh->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
 			Ref<Material> mat = mesh_items[mesh_i].mesh->surface_get_material(j);
@@ -913,25 +925,13 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 		}
 		Map<String, Ref<Image> >::Element *N = state.texture_atlas.find("normal");
 		if (N && !N->get()->empty()) {
-			bool has_normals = false;
-			N->get()->lock();
-			for (int32_t y = 0; y < N->get()->get_height(); y++) {
-				for (int32_t x = 0; x < N->get()->get_width(); x++) {
-					Color texel = N->get()->get_pixel(x, y);
-					if (texel != Color(0.0f, 0.0f, 0.0f, 0.0f)) {
-						has_normals = has_normals || true;
-					}
-				}
-			}
-			N->get()->unlock();
-			if (has_normals) {
-				Ref<ImageTexture> texture;
-				texture.instance();
-				texture->create_from_image(N->get());
-				texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
-				mat->set_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING, true);
-				mat->set_texture(SpatialMaterial::TEXTURE_NORMAL, texture);
-			}
+			Ref<ImageTexture> texture;
+			texture.instance();
+			Ref<Image> img = dilate(N->get());
+			texture->create_from_image(img);
+			texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			mat->set_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING, true);
+			mat->set_texture(SpatialMaterial::TEXTURE_NORMAL, texture);
 		}
 		Map<String, Ref<Image> >::Element *ORM = state.texture_atlas.find("orm");
 		if (ORM && !ORM->get()->empty()) {
