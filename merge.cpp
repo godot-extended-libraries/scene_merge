@@ -56,6 +56,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/surface_tool.h"
 
+#include "core/bind/core_bind.h"
 #include "merge.h"
 
 void SceneMerge::merge(const String p_file, Node *p_root_node) {
@@ -64,7 +65,8 @@ void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	Node *root = scene->instance();
 	Ref<MeshMergeMaterialRepack> repack;
 	repack.instance();
-	root = repack->merge(root, p_root_node);
+	root = repack->merge(root, p_root_node, p_file);
+	ERR_FAIL_COND(!root);
 	scene->pack(root);
 	ResourceSaver::save(p_file, scene);
 }
@@ -190,7 +192,7 @@ void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshState> &r_ite
 	}
 }
 
-Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
+Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String p_output_path) {
 	Vector<MeshState> mesh_items;
 	_find_all_mesh_instances(mesh_items, p_root, p_root);
 	_find_all_animated_meshes(mesh_items, p_root, p_root);
@@ -233,7 +235,19 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root) {
 	atlas_lookup.resize(atlas->width * atlas->height);
 	Map<String, Ref<Image> > texture_atlas;
 
-	MergeState state = { p_root, atlas, mesh_items, mesh_to_index_to_material, uv_groups, model_vertices, p_root->get_name(), pack_options, atlas_lookup, material_cache, texture_atlas };
+	MergeState state = {
+		p_root, atlas,
+		mesh_items,
+		mesh_to_index_to_material,
+		uv_groups,
+		model_vertices,
+		p_root->get_name(),
+		p_output_path,
+		pack_options,
+		atlas_lookup,
+		material_cache,
+		texture_atlas
+	};
 
 	EditorProgress progress_scene_merge("gen_get_source_material", TTR("Get source material"), state.material_cache.size());
 	int step = 0;
@@ -906,49 +920,80 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 	if (state.atlas->width != 0 || state.atlas->height != 0) {
 		Map<String, Ref<Image> >::Element *A = state.texture_atlas.find("albedo");
 		if (A && !A->get()->empty()) {
-			Ref<ImageTexture> texture;
-			texture.instance();
 			Ref<Image> img = dilate(A->get());
-			texture->create_from_image(img);
-			texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
-			mat->set_texture(SpatialMaterial::TEXTURE_ALBEDO, texture);
+			String path = state.output_path;
+			String base_dir = path.get_base_dir();
+			path = base_dir.plus_file(path.get_basename().get_file() + "_albedo.res");
+			Ref<_Directory> directory;
+			directory.instance();
+			ERR_FAIL_COND_V(directory->file_exists(path), nullptr);
+			Ref<ImageTexture> tex;
+			tex.instance();
+			tex->create_from_image(img);
+			tex->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			ResourceSaver::save(path, tex);
+			RES res = ResourceLoader::load(path, "Texture");
+			mat->set_texture(SpatialMaterial::TEXTURE_ALBEDO, res);
 		}
 		Map<String, Ref<Image> >::Element *E = state.texture_atlas.find("emission");
 		if (E && !E->get()->empty()) {
-			Ref<ImageTexture> texture;
-			texture.instance();
 			Ref<Image> img = dilate(E->get());
-			texture->create_from_image(img);
-			texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			String path = state.output_path;
+			String base_dir = path.get_base_dir();
+			path = base_dir.plus_file(path.get_basename().get_file() + "_emission.res");
+			Ref<_Directory> directory;
+			directory.instance();
+			ERR_FAIL_COND_V(directory->file_exists(path), nullptr);
+			Ref<ImageTexture> tex;
+			tex.instance();
+			tex->create_from_image(img);
+			tex->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			ResourceSaver::save(path, tex);
+			RES res = ResourceLoader::load(path, "Texture");
 			mat->set_feature(SpatialMaterial::FEATURE_EMISSION, true);
-			mat->set_texture(SpatialMaterial::TEXTURE_EMISSION, texture);
+			mat->set_texture(SpatialMaterial::TEXTURE_EMISSION, res);
 		}
 		Map<String, Ref<Image> >::Element *N = state.texture_atlas.find("normal");
 		if (N && !N->get()->empty()) {
-			Ref<ImageTexture> texture;
-			texture.instance();
 			Ref<Image> img = dilate(N->get());
-			texture->create_from_image(img);
-			texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			String path = state.output_path;
+			String base_dir = path.get_base_dir();
+			path = base_dir.plus_file(path.get_basename().get_file() + "_normal.res");
+			Ref<_Directory> directory;
+			directory.instance();
+			Ref<ImageTexture> tex;
+			tex.instance();
+			tex->create_from_image(img);
+			tex->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			ResourceSaver::save(path, tex);
+			RES res = ResourceLoader::load(path, "Texture");
 			mat->set_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING, true);
-			mat->set_texture(SpatialMaterial::TEXTURE_NORMAL, texture);
+			mat->set_texture(SpatialMaterial::TEXTURE_NORMAL, res);
 		}
 		Map<String, Ref<Image> >::Element *ORM = state.texture_atlas.find("orm");
 		if (ORM && !ORM->get()->empty()) {
-			Ref<ImageTexture> texture;
-			texture.instance();
 			Ref<Image> img = dilate(ORM->get());
-			texture->create_from_image(img);
-			texture->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			String path = state.output_path;
+			String base_dir = path.get_base_dir();
+			path = base_dir.plus_file(path.get_basename().get_file() + "_orm.res");
+			Ref<_Directory> directory;
+			directory.instance();
+			ERR_FAIL_COND_V(directory->file_exists(path), nullptr);
+			Ref<ImageTexture> tex;
+			tex.instance();
+			tex->create_from_image(img);
+			tex->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
+			ResourceSaver::save(path, tex);
+			RES res = ResourceLoader::load(path, "Texture");
 			mat->set_cull_mode(SpatialMaterial::CULL_DISABLED);
 			mat->set_ao_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_RED);
 			mat->set_feature(SpatialMaterial::FEATURE_AMBIENT_OCCLUSION, true);
-			mat->set_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION, texture);
+			mat->set_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION, tex);
 			mat->set_roughness_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_GREEN);
-			mat->set_texture(SpatialMaterial::TEXTURE_ROUGHNESS, texture);
+			mat->set_texture(SpatialMaterial::TEXTURE_ROUGHNESS, tex);
 			mat->set_metallic_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_BLUE);
 			mat->set_metallic(1.0);
-			mat->set_texture(SpatialMaterial::TEXTURE_METALLIC, texture);
+			mat->set_texture(SpatialMaterial::TEXTURE_METALLIC, res);
 		}
 	}
 	MeshInstance *mi = memnew(MeshInstance);

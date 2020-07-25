@@ -448,6 +448,7 @@ private:
 		const Vector<Vector<Vector2> > uvs;
 		const Vector<Vector<ModelVertex> > &model_vertices;
 		String p_name;
+		String output_path;
 		const xatlas::PackOptions &pack_options;
 		Vector<AtlasLookupTexel> &atlas_lookup;
 		Vector<Ref<Material> > &material_cache;
@@ -457,7 +458,7 @@ private:
 	Ref<Image> dilate(Ref<Image> source_image);
 	const int32_t texture_minimum_side = 512;
 public:
-	Node *merge(Node *p_root, Node *p_original_root);
+	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
 	void _generate_texture_atlas(MergeState &state, String texture_type);
 	Ref<Image> _get_source_texture(MergeState &state, Ref<SpatialMaterial> material, String texture_type);
 	void _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
