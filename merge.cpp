@@ -950,7 +950,7 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		}
 		if (A && !A->get()->empty()) {
 			Ref<Image> img = dilate(A->get());
-			img->compress(compress_mode);
+			img->compress(compress_mode, Image::COMPRESS_SOURCE_SRGB);
 			String path = state.output_path;
 			String base_dir = path.get_base_dir();
 			path = base_dir.plus_file(path.get_basename().get_file() + "_albedo");
