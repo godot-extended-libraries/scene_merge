@@ -738,7 +738,7 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 			meshDecl.rotateCharts = false;
 			xatlas::AddMeshError::Enum error = xatlas::AddUvMesh(atlas, meshDecl);
 			if (error != xatlas::AddMeshError::Success) {
-				print_error(error != xatlas::AddMeshError::Success, "Error adding mesh %d: %s\n" + itos(mesh_i) + xatlas::StringForEnum(error));
+				print_error("Error adding mesh %d: %s\n" + itos(mesh_i) + xatlas::StringForEnum(error));
 			}
 			mesh_count++;
 		}
