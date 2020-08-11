@@ -735,6 +735,7 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 	}
 	pack_options.bilinear = false;
 	pack_options.padding = 16;
+	pack_options.texelsPerUnit = 0.8f;
 	pack_options.bruteForce = true;
 	pack_options.blockAlign = true;
 	pack_options.resolution = 2048;
