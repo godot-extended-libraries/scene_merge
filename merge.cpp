@@ -44,6 +44,8 @@ Copyright (c) 2013 Thekla, Inc
 Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 */
 
+#include "merge.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #define TEXBLEED_IMPLEMENTATION 1
@@ -55,9 +57,8 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "scene/resources/mesh_data_tool.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/surface_tool.h"
-
 #include "core/bind/core_bind.h"
-#include "merge.h"
+#include "core/image.h"
 
 void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	PackedScene *scene = memnew(PackedScene);
@@ -942,8 +943,13 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	mat->set_name("Atlas");
 	if (state.atlas->width != 0 || state.atlas->height != 0) {
 		Map<String, Ref<Image> >::Element *A = state.texture_atlas.find("albedo");
+		Image::CompressMode compress_mode = Image::COMPRESS_ETC;
+		if (Image::_image_compress_bc_func) {
+			compress_mode = Image::COMPRESS_S3TC;
+		}
 		if (A && !A->get()->empty()) {
 			Ref<Image> img = dilate(A->get());
+			img->compress(compress_mode);
 			String path = state.output_path;
 			String base_dir = path.get_base_dir();
 			path = base_dir.plus_file(path.get_basename().get_file() + "_albedo");
@@ -953,7 +959,6 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
-			tex->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
 			ResourceSaver::save(path, tex);
 			RES res = ResourceLoader::load(path, "Texture");
 			mat->set_texture(SpatialMaterial::TEXTURE_ALBEDO, res);
@@ -961,6 +966,7 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Map<String, Ref<Image> >::Element *E = state.texture_atlas.find("emission");
 		if (E && !E->get()->empty()) {
 			Ref<Image> img = dilate(E->get());
+			img->compress(compress_mode);
 			String path = state.output_path;
 			String base_dir = path.get_base_dir();
 			path = base_dir.plus_file(path.get_basename().get_file() + "_emission");
@@ -970,7 +976,6 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
-			tex->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
 			ResourceSaver::save(path, tex);
 			RES res = ResourceLoader::load(path, "Texture");
 			mat->set_feature(SpatialMaterial::FEATURE_EMISSION, true);
@@ -979,6 +984,7 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Map<String, Ref<Image> >::Element *N = state.texture_atlas.find("normal");
 		if (N && !N->get()->empty()) {
 			Ref<Image> img = dilate(N->get());
+			img->compress(compress_mode, Image::COMPRESS_SOURCE_NORMAL);
 			String path = state.output_path;
 			String base_dir = path.get_base_dir();
 			path = base_dir.plus_file(path.get_basename().get_file() + "_normal");
@@ -988,7 +994,6 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
-			tex->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
 			ResourceSaver::save(path, tex);
 			RES res = ResourceLoader::load(path, "Texture");
 			mat->set_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING, true);
@@ -997,6 +1002,7 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Map<String, Ref<Image> >::Element *ORM = state.texture_atlas.find("orm");
 		if (ORM && !ORM->get()->empty()) {
 			Ref<Image> img = dilate(ORM->get());
+			img->compress(compress_mode);
 			String path = state.output_path;
 			String base_dir = path.get_base_dir();
 			path = base_dir.plus_file(path.get_basename().get_file() + "_orm");
@@ -1006,7 +1012,6 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
-			tex->set_storage(ImageTexture::STORAGE_COMPRESS_LOSSY);
 			ResourceSaver::save(path, tex);
 			RES res = ResourceLoader::load(path, "Texture");
 			mat->set_cull_mode(SpatialMaterial::CULL_DISABLED);
