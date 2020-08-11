@@ -136,13 +136,10 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 				for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 					Array array = array_mesh->surface_get_arrays(surface_i);
 					MeshMerge &mesh = r_items.write[r_items.size() - 1];
-					if (mesh.vertex_count > 65536 && try_again) {
+					if (mesh.vertex_count > 65536) {
 						MeshMerge mesh;
 						r_items.push_back(mesh);
 						mesh = r_items.write[r_items.size() - 1];
-						try_again = false;
-					} else {
-						try_again = true;
 					}
 					Array vertexes = array[ArrayMesh::ARRAY_VERTEX];
 					Array bones = array[ArrayMesh::ARRAY_BONES];
@@ -744,9 +741,9 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 		}
 	}
 	pack_options.bilinear = false;
-	pack_options.padding = 32;
-	pack_options.texelsPerUnit = 0.8f;
+	pack_options.padding = 16;
 	pack_options.blockAlign = true;
+	pack_options.resolution = 2048;
 	xatlas::PackCharts(atlas, pack_options);
 }
 
@@ -956,10 +953,16 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			Ref<Image> img = dilate(A->get());
 			String path = state.output_path;
 			String base_dir = path.get_base_dir();
-			path = base_dir.plus_file(path.get_basename().get_file() + "_albedo.res");
+			path = base_dir.plus_file(path.get_basename().get_file() + "_albedo");
 			Ref<_Directory> directory;
 			directory.instance();
-			ERR_FAIL_COND_V(directory->file_exists(path), nullptr);
+			int32_t count = 0;
+			while(directory->file_exists(path), nullptr) {
+				count++;
+			}
+			path += "_";
+			path += itos(count);
+			path += ".res";
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
@@ -973,10 +976,16 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			Ref<Image> img = dilate(E->get());
 			String path = state.output_path;
 			String base_dir = path.get_base_dir();
-			path = base_dir.plus_file(path.get_basename().get_file() + "_emission.res");
+			path = base_dir.plus_file(path.get_basename().get_file() + "_emission");
 			Ref<_Directory> directory;
 			directory.instance();
-			ERR_FAIL_COND_V(directory->file_exists(path), nullptr);
+			int32_t count = 0;
+			while (directory->file_exists(path), nullptr) {
+				count++;
+			}
+			path += "_";
+			path += itos(count);
+			path += ".res";
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
@@ -991,9 +1000,16 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			Ref<Image> img = dilate(N->get());
 			String path = state.output_path;
 			String base_dir = path.get_base_dir();
-			path = base_dir.plus_file(path.get_basename().get_file() + "_normal.res");
+			path = base_dir.plus_file(path.get_basename().get_file() + "_normal");
 			Ref<_Directory> directory;
 			directory.instance();
+			int32_t count = 0;
+			while (directory->file_exists(path), nullptr) {
+				count++;
+			}
+			path += "_";
+			path += itos(count);
+			path += ".res";
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
@@ -1008,10 +1024,16 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			Ref<Image> img = dilate(ORM->get());
 			String path = state.output_path;
 			String base_dir = path.get_base_dir();
-			path = base_dir.plus_file(path.get_basename().get_file() + "_orm.res");
+			path = base_dir.plus_file(path.get_basename().get_file() + "_orm");
 			Ref<_Directory> directory;
 			directory.instance();
-			ERR_FAIL_COND_V(directory->file_exists(path), nullptr);
+			int32_t count = 0;
+			while (directory->file_exists(path), nullptr) {
+				count++;
+			}
+			path += "_";
+			path += itos(count);
+			path += ".res";
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
