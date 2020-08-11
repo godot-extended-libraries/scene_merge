@@ -182,11 +182,11 @@ void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshMerge> &r_ite
 		ap->get_animation_list(&animation_names);
 		Map<String, MeshState> paths;
 		for (int32_t mesh_merge_i = 0; mesh_merge_i < r_items.size(); mesh_merge_i++) {
-			MeshMerge mesh_merg = r_items[mesh_merge_i];
+			MeshMerge &mesh_merg = r_items.write[mesh_merge_i];
 			for (int32_t i = 0; i < mesh_merg.meshes.size(); i++) {
-				MeshInstance *mi = mesh_merg.meshes[i].mesh_instance;
+				MeshInstance *mi = mesh_merg.meshes.write[i].mesh_instance;
 				String path = ap->get_parent()->get_path_to(mi);
-				paths.insert(path, mesh_merg.meshes[i]);
+				paths.insert(path, mesh_merg.meshes.write[i]);
 			}
 			for (int32_t anim_i = 0; anim_i < animation_names.size(); anim_i++) {
 				Ref<Animation> anim = ap->get_animation(animation_names[anim_i]);
