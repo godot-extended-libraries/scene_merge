@@ -946,7 +946,7 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Map<String, Ref<Image> >::Element *A = state.texture_atlas.find("albedo");
 		Image::CompressMode compress_mode = Image::COMPRESS_ETC;
 		if (Image::_image_compress_bc_func) {
-			compress_mode = Image::COMPRESS_S3TC;
+			compress_mode = Image::COMPRESS_BPTC;
 		}
 		if (A && !A->get()->empty()) {
 			Ref<Image> img = dilate(A->get());
