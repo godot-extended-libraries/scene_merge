@@ -186,8 +186,6 @@ private:
 		uint32_t atlas_width = 0;
 	};
 
-	static bool setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float);
-
 	const int32_t default_texture_length = 512;
 
 	struct ModelVertex {
@@ -201,9 +199,6 @@ private:
 		MeshInstance *mesh_instance;
 		bool operator==(const MeshState &rhs) const;
 	};
-
-	void _find_all_animated_meshes(Vector<MeshState> &r_items, Node *p_current_node, const Node *p_owner);
-	void _find_all_mesh_instances(Vector<MeshState> &r_items, Node *p_current_node, const Node *p_owner);
 	struct MaterialImageCache {
 		Ref<Image> albedo_img;
 		Ref<Image> normal_img;
@@ -225,12 +220,19 @@ private:
 		Map<String, Ref<Image> > texture_atlas;
 		Map<int32_t, MaterialImageCache> material_image_cache;
 	};
-	Ref<Image> dilate(Ref<Image> source_image);
 	const int32_t texture_minimum_side = 512;
-
+	struct MeshMerge {
+		Vector<MeshState> meshes;
+		int vertex_count;
+	};
+	static bool setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float);
+	Ref<Image> dilate(Ref<Image> source_image);
+	void _find_all_animated_meshes(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
+	void _find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
 public:
 	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
-	Node *_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> original_mesh_items, Node *p_root, String p_output_path);
+	Node *_generate_list(Node *p_root, Node *p_original_root, String p_output_path);
+	Node *_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> &original_mesh_items, Node *p_root, String p_output_path);
 	void _generate_texture_atlas(MergeState &state, String texture_type);
 	Ref<Image> _get_source_texture(MergeState &state, Ref<SpatialMaterial> material, String texture_type);
 	void _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,

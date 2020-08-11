@@ -104,7 +104,7 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 	return false;
 }
 
-void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshState> &r_items, Node *p_current_node, const Node *p_owner) {
+void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner) {
 	MeshInstance *mi = Object::cast_to<MeshInstance>(p_current_node);
 	if (mi) {
 		Ref<ArrayMesh> array_mesh = mi->get_mesh();
@@ -128,8 +128,23 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshState> &r_item
 				}
 			}
 			if (!has_blends && !has_bones && !has_transparency) {
+				if (!r_items.size()) {
+					MeshMerge mesh;
+					r_items.push_back(mesh);
+				}
+				bool try_again = true;
 				for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 					Array array = array_mesh->surface_get_arrays(surface_i);
+					MeshMerge &mesh = r_items.write[r_items.size() - 1];
+					if (mesh.vertex_count > 65536 && try_again) {
+						MeshMerge mesh;
+						r_items.push_back(mesh);
+						mesh = r_items.write[r_items.size() - 1];
+						try_again = false;
+					} else {
+						try_again = true;
+					}
+					Array vertexes = array[ArrayMesh::ARRAY_VERTEX];
 					Array bones = array[ArrayMesh::ARRAY_BONES];
 					Array uvs = array[ArrayMesh::ARRAY_TEX_UV];
 					has_bones |= bones.size() != 0;
@@ -151,7 +166,8 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshState> &r_item
 							mesh_state.path = mi->get_path();
 						}
 						mesh_state.mesh_instance = mi;
-						r_items.push_back(mesh_state);
+						mesh.vertex_count += vertexes.size();
+						mesh.meshes.push_back(mesh_state);
 					}
 				}
 			}
@@ -162,26 +178,29 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshState> &r_item
 	}
 }
 
-void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshState> &r_items, Node *p_current_node, const Node *p_owner) {
+void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner) {
 	AnimationPlayer *ap = Object::cast_to<AnimationPlayer>(p_current_node);
 	if (ap) {
 		List<StringName> animation_names;
 		ap->get_animation_list(&animation_names);
 		Map<String, MeshState> paths;
-		for (int32_t i = 0; i < r_items.size(); i++) {
-			MeshInstance *mi = r_items[i].mesh_instance;
-			String path = ap->get_parent()->get_path_to(mi);
-			paths.insert(path, r_items[i]);
-		}
-		for (int32_t anim_i = 0; anim_i < animation_names.size(); anim_i++) {
-			Ref<Animation> anim = ap->get_animation(animation_names[anim_i]);
-			for (Map<String, MeshState>::Element *E = paths.front(); E; E = E->next()) {
-				String path = E->key();
-				for (int32_t track_i = 0; track_i < anim->get_track_count(); track_i++) {
-					NodePath anim_path = anim->track_get_path(track_i);
-					String anim_path_string = anim_path;
-					if (path.begins_with(anim_path_string) && r_items.find(E->get()) != -1) {
-						r_items.erase(E->get());
+		for (int32_t mesh_merge_i = 0; mesh_merge_i < r_items.size(); mesh_merge_i++) {
+			MeshMerge mesh_merg = r_items[mesh_merge_i];
+			for (int32_t i = 0; i < mesh_merg.meshes.size(); i++) {
+				MeshInstance *mi = mesh_merg.meshes[i].mesh_instance;
+				String path = ap->get_parent()->get_path_to(mi);
+				paths.insert(path, mesh_merg.meshes[i]);
+			}
+			for (int32_t anim_i = 0; anim_i < animation_names.size(); anim_i++) {
+				Ref<Animation> anim = ap->get_animation(animation_names[anim_i]);
+				for (Map<String, MeshState>::Element *E = paths.front(); E; E = E->next()) {
+					String path = E->key();
+					for (int32_t track_i = 0; track_i < anim->get_track_count(); track_i++) {
+						NodePath anim_path = anim->track_get_path(track_i);
+						String anim_path_string = anim_path;
+						if (path.begins_with(anim_path_string) && mesh_merg.meshes.find(E->get()) != -1) {
+							mesh_merg.meshes.erase(E->get());
+						}
 					}
 				}
 			}
@@ -193,22 +212,30 @@ void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshState> &r_ite
 }
 
 Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String p_output_path) {
-	Vector<MeshState> mesh_items;
+	return _generate_list(p_root, p_original_root, p_output_path);	
+	return p_root;
+}
+
+Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_root, String p_output_path) {
+	Vector<MeshMerge> mesh_items;
 	_find_all_mesh_instances(mesh_items, p_root, p_root);
 	_find_all_animated_meshes(mesh_items, p_root, p_root);
 
-	Vector<MeshState> original_mesh_items;
+	Vector<MeshMerge> original_mesh_items;
 	_find_all_mesh_instances(original_mesh_items, p_original_root, p_original_root);
 	_find_all_animated_meshes(original_mesh_items, p_original_root, p_original_root);
 	if (!original_mesh_items.size()) {
 		return p_root;
 	}
-	p_root = _merge_list(mesh_items, original_mesh_items, p_root, p_output_path);
-	
+
+	for (int32_t items_i = 0; items_i < mesh_items.size(); items_i++) {
+		p_root = _merge_list(mesh_items.write[items_i].meshes, original_mesh_items.write[items_i].meshes, p_root, p_output_path);
+	}
+
 	return p_root;
 }
 
-Node *MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> original_mesh_items, Node *p_root, String p_output_path) {
+Node *MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> &original_mesh_items, Node *p_root, String p_output_path) {
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
 	Ref<Material> empty_material;
@@ -711,7 +738,7 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 			meshDecl.rotateCharts = false;
 			xatlas::AddMeshError::Enum error = xatlas::AddUvMesh(atlas, meshDecl);
 			if (error != xatlas::AddMeshError::Success) {
-				ERR_CONTINUE_MSG(error != xatlas::AddMeshError::Success, "Error adding mesh %d: %s\n" + itos(mesh_i) + xatlas::StringForEnum(error));
+				print_error(error != xatlas::AddMeshError::Success, "Error adding mesh %d: %s\n" + itos(mesh_i) + xatlas::StringForEnum(error));
 			}
 			mesh_count++;
 		}
