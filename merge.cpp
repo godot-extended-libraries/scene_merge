@@ -113,7 +113,6 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 			bool has_bones = false;
 			bool has_transparency = false;
 			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
-
 				Array array = array_mesh->surface_get_arrays(surface_i);
 				Array bones = array[ArrayMesh::ARRAY_BONES];
 				has_bones |= bones.size() != 0;
@@ -128,18 +127,11 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 				}
 			}
 			if (!has_blends && !has_bones && !has_transparency) {
-				if (!r_items.size()) {
-					MeshMerge mesh;
-					r_items.push_back(mesh);
-				}
-				bool try_again = true;
 				for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 					Array array = array_mesh->surface_get_arrays(surface_i);
-					MeshMerge &mesh = r_items.write[r_items.size() - 1];
-					if (mesh.vertex_count > 65536) {
-						MeshMerge mesh;
-						r_items.push_back(mesh);
-						mesh = r_items.write[r_items.size() - 1];
+					if (r_items[r_items.size() - 1].vertex_count > 65536) {
+						MeshMerge new_mesh;
+						r_items.push_back(new_mesh);
 					}
 					Array vertexes = array[ArrayMesh::ARRAY_VERTEX];
 					Array bones = array[ArrayMesh::ARRAY_BONES];
@@ -163,6 +155,7 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 							mesh_state.path = mi->get_path();
 						}
 						mesh_state.mesh_instance = mi;
+						MeshMerge &mesh = r_items.write[r_items.size() - 1];
 						mesh.vertex_count += vertexes.size();
 						mesh.meshes.push_back(mesh_state);
 					}
@@ -209,30 +202,31 @@ void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshMerge> &r_ite
 }
 
 Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String p_output_path) {
-	return _generate_list(p_root, p_original_root, p_output_path);	
-	return p_root;
+	return _generate_list(p_root, p_original_root, p_output_path);
 }
 
 Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_root, String p_output_path) {
 	Vector<MeshMerge> mesh_items;
+	mesh_items.resize(1);
 	_find_all_mesh_instances(mesh_items, p_root, p_root);
 	_find_all_animated_meshes(mesh_items, p_root, p_root);
 
 	Vector<MeshMerge> original_mesh_items;
+	original_mesh_items.resize(1);
 	_find_all_mesh_instances(original_mesh_items, p_original_root, p_original_root);
 	_find_all_animated_meshes(original_mesh_items, p_original_root, p_original_root);
-	if (!original_mesh_items.size()) {
+	if (original_mesh_items.size() != mesh_items.size()) {
 		return p_root;
-	}
+	}	
 
 	for (int32_t items_i = 0; items_i < mesh_items.size(); items_i++) {
-		p_root = _merge_list(mesh_items.write[items_i].meshes, original_mesh_items.write[items_i].meshes, p_root, p_output_path);
+		p_root = _merge_list(mesh_items.write[items_i].meshes, original_mesh_items.write[items_i].meshes, p_root, p_output_path, items_i);
 	}
 
 	return p_root;
 }
 
-Node *MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> &original_mesh_items, Node *p_root, String p_output_path) {
+Node * MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> &original_mesh_items, Node *p_root, String p_output_path, int p_index) {
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
 	Ref<Material> empty_material;
@@ -393,7 +387,7 @@ Node *MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector
 	_generate_texture_atlas(state, "orm");
 	_generate_texture_atlas(state, "emission");
 	ERR_FAIL_COND_V(state.atlas->width <= 0 && state.atlas->height <= 0, state.p_root);
-	p_root = _output(state);
+	p_root = _output(state, p_index);
 
 	xatlas::Destroy(atlas);
 	return p_root;
@@ -734,9 +728,7 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 			meshDecl.faceMaterialData = materials.ptr();
 			meshDecl.rotateCharts = false;
 			xatlas::AddMeshError::Enum error = xatlas::AddUvMesh(atlas, meshDecl);
-			if (error != xatlas::AddMeshError::Success) {
-				print_error("Error adding mesh %d: %s\n" + itos(mesh_i) + xatlas::StringForEnum(error));
-			}
+			ERR_CONTINUE_MSG(error != xatlas::AddMeshError::Success, "Error adding mesh %d: %s\n" + itos(mesh_i) + xatlas::StringForEnum(error));
 			mesh_count++;
 		}
 	}
@@ -910,7 +902,7 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshSta
 	}
 }
 
-Node *MeshMergeMaterialRepack::_output(MergeState &state) {
+Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	MeshMergeMaterialRepack::TextureData texture_data;
 	for (int32_t mesh_i = 0; mesh_i < state.r_mesh_items.size(); mesh_i++) {
 		if (state.r_mesh_items[mesh_i].mesh_instance->get_parent()) {
@@ -957,13 +949,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			path = base_dir.plus_file(path.get_basename().get_file() + "_albedo");
 			Ref<_Directory> directory;
 			directory.instance();
-			int32_t count = 0;
-			while(directory->file_exists(path), nullptr) {
-				count++;
-			}
-			path += "_";
-			path += itos(count);
-			path += ".res";
+			path += "_" + itos(p_count) + ".res";
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
@@ -980,13 +966,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			path = base_dir.plus_file(path.get_basename().get_file() + "_emission");
 			Ref<_Directory> directory;
 			directory.instance();
-			int32_t count = 0;
-			while (directory->file_exists(path), nullptr) {
-				count++;
-			}
-			path += "_";
-			path += itos(count);
-			path += ".res";
+			path += "_" + itos(p_count) + ".res";
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
@@ -1004,13 +984,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			path = base_dir.plus_file(path.get_basename().get_file() + "_normal");
 			Ref<_Directory> directory;
 			directory.instance();
-			int32_t count = 0;
-			while (directory->file_exists(path), nullptr) {
-				count++;
-			}
-			path += "_";
-			path += itos(count);
-			path += ".res";
+			path += "_" + itos(p_count) + ".res";
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
@@ -1028,13 +1002,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state) {
 			path = base_dir.plus_file(path.get_basename().get_file() + "_orm");
 			Ref<_Directory> directory;
 			directory.instance();
-			int32_t count = 0;
-			while (directory->file_exists(path), nullptr) {
-				count++;
-			}
-			path += "_";
-			path += itos(count);
-			path += ".res";
+			path += "_" + itos(p_count) + ".res";
 			Ref<ImageTexture> tex;
 			tex.instance();
 			tex->create_from_image(img);
