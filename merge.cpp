@@ -195,7 +195,7 @@ void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshMerge> &r_ite
 					for (int32_t track_i = 0; track_i < anim->get_track_count(); track_i++) {
 						NodePath anim_path = anim->track_get_path(track_i);
 						String anim_path_string = anim_path;
-						if (path.begins_with(anim_path_string) && mesh_merg.meshes.find(E->get()) != -1) {
+						if (path.begins_with(anim_path_string) && mesh_merg.meshes.size() && mesh_merg.meshes.find(E->get()) != -1) {
 							mesh_merg.meshes.erase(E->get());
 						}
 					}
