@@ -961,7 +961,7 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 			tex.instance();
 			tex->create_from_image(img);
 			ResourceSaver::save(path, tex);
-			RES res = ResourceLoader::load(path, "Texture");
+			RES res = ResourceLoader::load(path, "Texture", true);
 			mat->set_texture(SpatialMaterial::TEXTURE_ALBEDO, res);
 		}
 		Map<String, Ref<Image> >::Element *E = state.texture_atlas.find("emission");
@@ -978,7 +978,7 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 			tex.instance();
 			tex->create_from_image(img);
 			ResourceSaver::save(path, tex);
-			RES res = ResourceLoader::load(path, "Texture");
+			RES res = ResourceLoader::load(path, "Texture", true);
 			mat->set_feature(SpatialMaterial::FEATURE_EMISSION, true);
 			mat->set_texture(SpatialMaterial::TEXTURE_EMISSION, res);
 		}
@@ -996,7 +996,7 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 			tex.instance();
 			tex->create_from_image(img);
 			ResourceSaver::save(path, tex);
-			RES res = ResourceLoader::load(path, "Texture");
+			RES res = ResourceLoader::load(path, "Texture", true);
 			mat->set_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING, true);
 			mat->set_texture(SpatialMaterial::TEXTURE_NORMAL, res);
 		}
@@ -1014,7 +1014,7 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 			tex.instance();
 			tex->create_from_image(img);
 			ResourceSaver::save(path, tex);
-			RES res = ResourceLoader::load(path, "Texture");
+			RES res = ResourceLoader::load(path, "Texture", true);
 			mat->set_cull_mode(SpatialMaterial::CULL_DISABLED);
 			mat->set_ao_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_RED);
 			mat->set_feature(SpatialMaterial::FEATURE_AMBIENT_OCCLUSION, true);
