@@ -703,6 +703,9 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 				continue;
 			}
 			Array indices = mesh[ArrayMesh::ARRAY_INDEX];
+			if (!indices.size()) {
+				continue;
+			}
 			xatlas::UvMeshDecl meshDecl;
 			meshDecl.vertexCount = r_uvs[mesh_count].size();
 			meshDecl.vertexUvData = r_uvs[mesh_count].ptr();
@@ -729,7 +732,7 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 			meshDecl.faceMaterialData = materials.ptr();
 			meshDecl.rotateCharts = false;
 			xatlas::AddMeshError::Enum error = xatlas::AddUvMesh(atlas, meshDecl);
-			ERR_CONTINUE_MSG(error != xatlas::AddMeshError::Success, "Error adding mesh %d: %s\n" + itos(mesh_i) + xatlas::StringForEnum(error));
+			ERR_CONTINUE_MSG(error != xatlas::AddMeshError::Success, String("Error adding mesh ") + itos(mesh_i) + String(": ") + xatlas::StringForEnum(error));
 			mesh_count++;
 		}
 	}
