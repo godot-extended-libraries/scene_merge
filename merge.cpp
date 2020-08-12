@@ -51,14 +51,14 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #define TEXBLEED_IMPLEMENTATION 1
 #include "thirdparty/misc/rjm_texbleed.h"
 
+#include "core/bind/core_bind.h"
+#include "core/image.h"
 #include "core/math/vector2.h"
 #include "core/math/vector3.h"
 #include "core/os/os.h"
 #include "scene/resources/mesh_data_tool.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/surface_tool.h"
-#include "core/bind/core_bind.h"
-#include "core/image.h"
 
 void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	PackedScene *scene = memnew(PackedScene);
@@ -113,6 +113,7 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 			bool has_blends = false;
 			bool has_bones = false;
 			bool has_transparency = false;
+			bool has_unnormalized_uvs = false;
 			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 				Array array = array_mesh->surface_get_arrays(surface_i);
 				Array bones = array[ArrayMesh::ARRAY_BONES];
@@ -123,11 +124,18 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 					Ref<Image> albedo_img = spatial_mat->get_texture(SpatialMaterial::TEXTURE_ALBEDO);
 					has_transparency |= spatial_mat->get_feature(SpatialMaterial::FEATURE_TRANSPARENT) || spatial_mat->get_flag(SpatialMaterial::FLAG_USE_ALPHA_SCISSOR);
 				}
-				if (has_blends || has_bones || has_transparency) {
+				Vector<Vector2> uvs = array[ArrayMesh::ARRAY_TEX_UV];
+				for (int32_t uv_i = 0; uv_i < uvs.size(); uv_i++) {
+					if ((uvs[uv_i].x > 1.0f || uvs[uv_i].x < 0.0f) && (uvs[uv_i].y > 1.0f || uvs[uv_i].y < 0.0f)) {
+						has_unnormalized_uvs = true;
+						break;
+					}
+				}
+				if (has_blends || has_bones || has_transparency || has_unnormalized_uvs) {
 					break;
 				}
 			}
-			if (!has_blends && !has_bones && !has_transparency) {
+			if (!has_blends && !has_bones && !has_transparency && !has_unnormalized_uvs) {
 				for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 					Array array = array_mesh->surface_get_arrays(surface_i);
 					if (r_items[r_items.size() - 1].vertex_count > 65536) {
@@ -218,7 +226,7 @@ Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_roo
 	_find_all_animated_meshes(original_mesh_items, p_original_root, p_original_root);
 	if (original_mesh_items.size() != mesh_items.size()) {
 		return p_root;
-	}	
+	}
 
 	for (int32_t items_i = 0; items_i < mesh_items.size(); items_i++) {
 		p_root = _merge_list(mesh_items.write[items_i].meshes, original_mesh_items.write[items_i].meshes, p_root, p_output_path, items_i);
@@ -227,7 +235,7 @@ Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_roo
 	return p_root;
 }
 
-Node * MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> &original_mesh_items, Node *p_root, String p_output_path, int p_index) {
+Node *MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> &original_mesh_items, Node *p_root, String p_output_path, int p_index) {
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
 	Ref<Material> empty_material;
@@ -236,15 +244,15 @@ Node * MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vecto
 	// Generate uv maps
 	{
 		for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh; 
-			for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) { 
-				Array mesh = array_mesh->surface_get_arrays(j); 
-				Array uvs = mesh[ArrayMesh::ARRAY_TEX_UV]; 
-				if (!uvs.size()) { 
-					array_mesh->mesh_unwrap(Transform(), 2.0f); 
-					break; 
-				} 
-			} 
+			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
+			for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
+				Array mesh = array_mesh->surface_get_arrays(j);
+				Array uvs = mesh[ArrayMesh::ARRAY_TEX_UV];
+				if (!uvs.size()) {
+					array_mesh->mesh_unwrap(Transform(), 2.0f);
+					break;
+				}
+			}
 		}
 	}
 
@@ -915,7 +923,7 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshSta
 	}
 }
 
-Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
+Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	MeshMergeMaterialRepack::TextureData texture_data;
 	for (int32_t mesh_i = 0; mesh_i < state.r_mesh_items.size(); mesh_i++) {
 		if (state.r_mesh_items[mesh_i].mesh_instance->get_parent()) {
@@ -1126,7 +1134,7 @@ bool MeshMergeMaterialRepack::MeshState::operator==(const MeshState &rhs) const 
 	return false;
 }
 
- MeshMergeMaterialRepack::ClippedTriangle::ClippedTriangle(const Vector2 &a, const Vector2 &b, const Vector2 &c) {
+MeshMergeMaterialRepack::ClippedTriangle::ClippedTriangle(const Vector2 &a, const Vector2 &b, const Vector2 &c) {
 	m_numVertices = 3;
 	m_activeVertexBuffer = 0;
 	m_verticesA[0] = a;
@@ -1218,7 +1226,7 @@ float MeshMergeMaterialRepack::ClippedTriangle::area() {
 	return m_area;
 }
 
- MeshMergeMaterialRepack::Triangle::Triangle(const Vector2 &v0, const Vector2 &v1, const Vector2 &v2, const Vector3 &t0, const Vector3 &t1, const Vector3 &t2) {
+MeshMergeMaterialRepack::Triangle::Triangle(const Vector2 &v0, const Vector2 &v1, const Vector2 &v2, const Vector3 &t0, const Vector3 &t1, const Vector3 &t2) {
 	// Init vertices.
 	this->v1 = v0;
 	this->v2 = v2;
