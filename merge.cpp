@@ -232,6 +232,22 @@ Node * MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vecto
 	Vector<Ref<Material> > material_cache;
 	Ref<Material> empty_material;
 	material_cache.push_back(empty_material);
+
+	// Generate uv maps
+	{
+		for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
+			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh; 
+			for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) { 
+				Array mesh = array_mesh->surface_get_arrays(j); 
+				Array uvs = mesh[ArrayMesh::ARRAY_TEX_UV]; 
+				if (!uvs.size()) { 
+					array_mesh->mesh_unwrap(Transform(), 2.0f); 
+					break; 
+				} 
+			} 
+		}
+	}
+
 	map_mesh_to_index_to_material(mesh_items, mesh_to_index_to_material, material_cache);
 
 	Vector<Vector<Vector2> > uv_groups;
@@ -879,14 +895,6 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
-		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
-			Array mesh = array_mesh->surface_get_arrays(j);
-			Array uvs = mesh[ArrayMesh::ARRAY_TEX_UV];
-			if (!uvs.size()) {
-				array_mesh->mesh_unwrap(Transform(), 2.0f);
-				break;
-			}
-		}
 		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
 			Array mesh = array_mesh->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
