@@ -1047,13 +1047,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 
 #ifdef TOOLS_ENABLED
 void SceneMergePlugin::merge(Variant p_user_data) {
-	file_export_lib->set_title(TTR("Export Library"));
-	file_export_lib->set_mode(EditorFileDialog::MODE_SAVE_FILE);
-	file_export_lib->connect("file_selected", this, "_dialog_action");
-	file_export_lib_merge->set_text(TTR("Merge With Existing"));
 	file_export_lib_merge->set_pressed(false);
-	file_export_lib->get_vbox()->add_child(file_export_lib_merge);
-	editor->get_gui_base()->add_child(file_export_lib);
 	List<String> extensions;
 	extensions.push_back("tscn");
 	extensions.push_back("scn");
@@ -1062,7 +1056,6 @@ void SceneMergePlugin::merge(Variant p_user_data) {
 		file_export_lib->add_filter("*." + extensions[extension_i] + " ; " + extensions[extension_i].to_upper());
 	}
 	file_export_lib->popup_centered_ratio();
-	file_export_lib->set_title(TTR("Merge Scene"));
 	Node *root = editor->get_tree()->get_edited_scene_root();
 	String filename = String(root->get_filename().get_file().get_basename());
 	if (filename.empty()) {
@@ -1103,7 +1096,14 @@ void SceneMergePlugin::_notification(int notification) {
 }
 
 SceneMergePlugin::SceneMergePlugin(EditorNode *p_node) {
-	editor = p_node;
+	editor = p_node;	
+	file_export_lib->set_title(TTR("Export Library"));
+	file_export_lib->set_mode(EditorFileDialog::MODE_SAVE_FILE);
+	file_export_lib->connect("file_selected", this, "_dialog_action");
+	file_export_lib_merge->set_text(TTR("Merge With Existing"));
+	file_export_lib->get_vbox()->add_child(file_export_lib_merge);
+	editor->get_gui_base()->add_child(file_export_lib);
+	file_export_lib->set_title(TTR("Merge Scene"));
 }
 #endif
 
