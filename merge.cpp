@@ -51,14 +51,14 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #define TEXBLEED_IMPLEMENTATION 1
 #include "thirdparty/misc/rjm_texbleed.h"
 
+#include "core/bind/core_bind.h"
+#include "core/image.h"
 #include "core/math/vector2.h"
 #include "core/math/vector3.h"
 #include "core/os/os.h"
 #include "scene/resources/mesh_data_tool.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/surface_tool.h"
-#include "core/bind/core_bind.h"
-#include "core/image.h"
 
 void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	PackedScene *scene = memnew(PackedScene);
@@ -218,7 +218,7 @@ Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_roo
 	_find_all_animated_meshes(original_mesh_items, p_original_root, p_original_root);
 	if (original_mesh_items.size() != mesh_items.size()) {
 		return p_root;
-	}	
+	}
 
 	for (int32_t items_i = 0; items_i < mesh_items.size(); items_i++) {
 		p_root = _merge_list(mesh_items.write[items_i].meshes, original_mesh_items.write[items_i].meshes, p_root, p_output_path, items_i);
@@ -227,7 +227,7 @@ Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_roo
 	return p_root;
 }
 
-Node * MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> &original_mesh_items, Node *p_root, String p_output_path, int p_index) {
+Node *MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> &original_mesh_items, Node *p_root, String p_output_path, int p_index) {
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
 	Ref<Material> empty_material;
@@ -728,7 +728,6 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 			meshDecl.indexCount = indexes.size();
 			meshDecl.indexData = indexes.ptr();
 			meshDecl.indexFormat = xatlas::IndexFormat::UInt32;
-			meshDecl.indexOffset = 0;
 			meshDecl.faceMaterialData = materials.ptr();
 			meshDecl.rotateCharts = false;
 			xatlas::AddMeshError::Enum error = xatlas::AddUvMesh(atlas, meshDecl);
@@ -907,7 +906,10 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshSta
 	}
 }
 
-Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
+Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
+	if (state.atlas->width == 0 || state.atlas->height == 0) {
+		return state.p_root;
+	}
 	MeshMergeMaterialRepack::TextureData texture_data;
 	for (int32_t mesh_i = 0; mesh_i < state.r_mesh_items.size(); mesh_i++) {
 		if (state.r_mesh_items[mesh_i].mesh_instance->get_parent()) {
@@ -945,89 +947,87 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	Ref<SpatialMaterial> mat;
 	mat.instance();
 	mat->set_name("Atlas");
-	if (state.atlas->width != 0 || state.atlas->height != 0) {
-		Map<String, Ref<Image> >::Element *A = state.texture_atlas.find("albedo");
-		Image::CompressMode compress_mode = Image::COMPRESS_ETC;
-		if (Image::_image_compress_bc_func) {
-			compress_mode = Image::COMPRESS_S3TC;
-		}
-		if (A && !A->get()->empty()) {
-			Ref<Image> img = dilate(A->get());
-			img->compress(compress_mode, Image::COMPRESS_SOURCE_SRGB);
-			String path = state.output_path;
-			String base_dir = path.get_base_dir();
-			path = base_dir.plus_file(path.get_basename().get_file() + "_albedo");
-			Ref<_Directory> directory;
-			directory.instance();
-			path += "_" + itos(p_count) + ".res";
-			Ref<ImageTexture> tex;
-			tex.instance();
-			tex->create_from_image(img);
-			ResourceSaver::save(path, tex);
-			RES res = ResourceLoader::load(path, "Texture", true);
-			mat->set_texture(SpatialMaterial::TEXTURE_ALBEDO, res);
-		}
-		Map<String, Ref<Image> >::Element *E = state.texture_atlas.find("emission");
-		if (E && !E->get()->empty()) {
-			Ref<Image> img = dilate(E->get());
-			img->compress(compress_mode);
-			String path = state.output_path;
-			String base_dir = path.get_base_dir();
-			path = base_dir.plus_file(path.get_basename().get_file() + "_emission");
-			Ref<_Directory> directory;
-			directory.instance();
-			path += "_" + itos(p_count) + ".res";
-			Ref<ImageTexture> tex;
-			tex.instance();
-			tex->create_from_image(img);
-			ResourceSaver::save(path, tex);
-			RES res = ResourceLoader::load(path, "Texture", true);
-			mat->set_feature(SpatialMaterial::FEATURE_EMISSION, true);
-			mat->set_texture(SpatialMaterial::TEXTURE_EMISSION, res);
-		}
-		Map<String, Ref<Image> >::Element *N = state.texture_atlas.find("normal");
-		if (N && !N->get()->empty()) {
-			Ref<Image> img = dilate(N->get());
-			img->compress(compress_mode, Image::COMPRESS_SOURCE_NORMAL);
-			String path = state.output_path;
-			String base_dir = path.get_base_dir();
-			path = base_dir.plus_file(path.get_basename().get_file() + "_normal");
-			Ref<_Directory> directory;
-			directory.instance();
-			path += "_" + itos(p_count) + ".res";
-			Ref<ImageTexture> tex;
-			tex.instance();
-			tex->create_from_image(img);
-			ResourceSaver::save(path, tex);
-			RES res = ResourceLoader::load(path, "Texture", true);
-			mat->set_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING, true);
-			mat->set_texture(SpatialMaterial::TEXTURE_NORMAL, res);
-		}
-		Map<String, Ref<Image> >::Element *ORM = state.texture_atlas.find("orm");
-		if (ORM && !ORM->get()->empty()) {
-			Ref<Image> img = dilate(ORM->get());
-			img->compress(compress_mode);
-			String path = state.output_path;
-			String base_dir = path.get_base_dir();
-			path = base_dir.plus_file(path.get_basename().get_file() + "_orm");
-			Ref<_Directory> directory;
-			directory.instance();
-			path += "_" + itos(p_count) + ".res";
-			Ref<ImageTexture> tex;
-			tex.instance();
-			tex->create_from_image(img);
-			ResourceSaver::save(path, tex);
-			RES res = ResourceLoader::load(path, "Texture", true);
-			mat->set_cull_mode(SpatialMaterial::CULL_DISABLED);
-			mat->set_ao_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_RED);
-			mat->set_feature(SpatialMaterial::FEATURE_AMBIENT_OCCLUSION, true);
-			mat->set_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION, tex);
-			mat->set_roughness_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_GREEN);
-			mat->set_texture(SpatialMaterial::TEXTURE_ROUGHNESS, tex);
-			mat->set_metallic_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_BLUE);
-			mat->set_metallic(1.0);
-			mat->set_texture(SpatialMaterial::TEXTURE_METALLIC, res);
-		}
+	Map<String, Ref<Image> >::Element *A = state.texture_atlas.find("albedo");
+	Image::CompressMode compress_mode = Image::COMPRESS_ETC;
+	if (Image::_image_compress_bc_func) {
+		compress_mode = Image::COMPRESS_S3TC;
+	}
+	if (A && !A->get()->empty()) {
+		Ref<Image> img = dilate(A->get());
+		img->compress(compress_mode, Image::COMPRESS_SOURCE_SRGB);
+		String path = state.output_path;
+		String base_dir = path.get_base_dir();
+		path = base_dir.plus_file(path.get_basename().get_file() + "_albedo");
+		Ref<_Directory> directory;
+		directory.instance();
+		path += "_" + itos(p_count) + ".res";
+		Ref<ImageTexture> tex;
+		tex.instance();
+		tex->create_from_image(img);
+		ResourceSaver::save(path, tex);
+		RES res = ResourceLoader::load(path, "Texture", true);
+		mat->set_texture(SpatialMaterial::TEXTURE_ALBEDO, res);
+	}
+	Map<String, Ref<Image> >::Element *E = state.texture_atlas.find("emission");
+	if (E && !E->get()->empty()) {
+		Ref<Image> img = dilate(E->get());
+		img->compress(compress_mode);
+		String path = state.output_path;
+		String base_dir = path.get_base_dir();
+		path = base_dir.plus_file(path.get_basename().get_file() + "_emission");
+		Ref<_Directory> directory;
+		directory.instance();
+		path += "_" + itos(p_count) + ".res";
+		Ref<ImageTexture> tex;
+		tex.instance();
+		tex->create_from_image(img);
+		ResourceSaver::save(path, tex);
+		RES res = ResourceLoader::load(path, "Texture", true);
+		mat->set_feature(SpatialMaterial::FEATURE_EMISSION, true);
+		mat->set_texture(SpatialMaterial::TEXTURE_EMISSION, res);
+	}
+	Map<String, Ref<Image> >::Element *N = state.texture_atlas.find("normal");
+	if (N && !N->get()->empty()) {
+		Ref<Image> img = dilate(N->get());
+		img->compress(compress_mode, Image::COMPRESS_SOURCE_NORMAL);
+		String path = state.output_path;
+		String base_dir = path.get_base_dir();
+		path = base_dir.plus_file(path.get_basename().get_file() + "_normal");
+		Ref<_Directory> directory;
+		directory.instance();
+		path += "_" + itos(p_count) + ".res";
+		Ref<ImageTexture> tex;
+		tex.instance();
+		tex->create_from_image(img);
+		ResourceSaver::save(path, tex);
+		RES res = ResourceLoader::load(path, "Texture", true);
+		mat->set_feature(SpatialMaterial::FEATURE_NORMAL_MAPPING, true);
+		mat->set_texture(SpatialMaterial::TEXTURE_NORMAL, res);
+	}
+	Map<String, Ref<Image> >::Element *ORM = state.texture_atlas.find("orm");
+	if (ORM && !ORM->get()->empty()) {
+		Ref<Image> img = dilate(ORM->get());
+		img->compress(compress_mode);
+		String path = state.output_path;
+		String base_dir = path.get_base_dir();
+		path = base_dir.plus_file(path.get_basename().get_file() + "_orm");
+		Ref<_Directory> directory;
+		directory.instance();
+		path += "_" + itos(p_count) + ".res";
+		Ref<ImageTexture> tex;
+		tex.instance();
+		tex->create_from_image(img);
+		ResourceSaver::save(path, tex);
+		RES res = ResourceLoader::load(path, "Texture", true);
+		mat->set_cull_mode(SpatialMaterial::CULL_DISABLED);
+		mat->set_ao_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_RED);
+		mat->set_feature(SpatialMaterial::FEATURE_AMBIENT_OCCLUSION, true);
+		mat->set_texture(SpatialMaterial::TEXTURE_AMBIENT_OCCLUSION, tex);
+		mat->set_roughness_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_GREEN);
+		mat->set_texture(SpatialMaterial::TEXTURE_ROUGHNESS, tex);
+		mat->set_metallic_texture_channel(SpatialMaterial::TEXTURE_CHANNEL_BLUE);
+		mat->set_metallic(1.0);
+		mat->set_texture(SpatialMaterial::TEXTURE_METALLIC, res);
 	}
 	MeshInstance *mi = memnew(MeshInstance);
 	Ref<ArrayMesh> array_mesh = st_all->commit();
@@ -1047,11 +1047,9 @@ Node * MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 
 #ifdef TOOLS_ENABLED
 void SceneMergePlugin::merge(Variant p_user_data) {
-	file_export_lib = memnew(EditorFileDialog);
 	file_export_lib->set_title(TTR("Export Library"));
 	file_export_lib->set_mode(EditorFileDialog::MODE_SAVE_FILE);
 	file_export_lib->connect("file_selected", this, "_dialog_action");
-	file_export_lib_merge = memnew(CheckBox);
 	file_export_lib_merge->set_text(TTR("Merge With Existing"));
 	file_export_lib_merge->set_pressed(false);
 	file_export_lib->get_vbox()->add_child(file_export_lib_merge);
@@ -1118,7 +1116,8 @@ bool MeshMergeMaterialRepack::MeshState::operator==(const MeshState &rhs) const 
 	return false;
 }
 
- MeshMergeMaterialRepack::ClippedTriangle::ClippedTriangle(const Vector2 &a, const Vector2 &b, const Vector2 &c) {
+MeshMergeMaterialRepack::ClippedTriangle::ClippedTriangle(const Vector2 &a, const Vector2 &b, const Vector2 &c) {
+	m_area = 0;
 	m_numVertices = 3;
 	m_activeVertexBuffer = 0;
 	m_verticesA[0] = a;
@@ -1210,7 +1209,7 @@ float MeshMergeMaterialRepack::ClippedTriangle::area() {
 	return m_area;
 }
 
- MeshMergeMaterialRepack::Triangle::Triangle(const Vector2 &v0, const Vector2 &v1, const Vector2 &v2, const Vector3 &t0, const Vector3 &t1, const Vector3 &t2) {
+MeshMergeMaterialRepack::Triangle::Triangle(const Vector2 &v0, const Vector2 &v1, const Vector2 &v2, const Vector3 &t0, const Vector3 &t1, const Vector3 &t2) {
 	// Init vertices.
 	this->v1 = v0;
 	this->v2 = v2;

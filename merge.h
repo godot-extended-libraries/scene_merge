@@ -81,8 +81,8 @@ class SceneMergePlugin : public EditorPlugin {
 	GDCLASS(SceneMergePlugin, EditorPlugin);
 
 	EditorNode *editor;
-	CheckBox *file_export_lib_merge;
-	EditorFileDialog *file_export_lib;
+	CheckBox *file_export_lib_merge = memnew(CheckBox);
+	EditorFileDialog *file_export_lib = memnew(EditorFileDialog);
 	Ref<SceneMerge> scene_optimize;
 	void _dialog_action(String p_file);
 	void merge(Variant p_user_data);
@@ -180,7 +180,7 @@ private:
 	struct SetAtlasTexelArgs {
 		Ref<Image> atlasData;
 		Ref<Image> sourceTexture;
-		AtlasLookupTexel *atlas_lookup;
+		AtlasLookupTexel *atlas_lookup = nullptr;
 		uint16_t material_index = 0;
 		Vector2 source_uvs[3];
 		uint32_t atlas_width = 0;
