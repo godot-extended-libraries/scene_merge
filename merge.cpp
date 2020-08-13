@@ -1088,8 +1088,6 @@ void SceneMergePlugin::_dialog_action(String p_file) {
 	}
 	scene_optimize->merge(p_file, node);
 	EditorFileSystem::get_singleton()->scan_changes();
-	file_export_lib->queue_delete();
-	file_export_lib_merge->queue_delete();
 }
 void SceneMergePlugin::_bind_methods() {
 	ClassDB::bind_method("_dialog_action", &SceneMergePlugin::_dialog_action);
