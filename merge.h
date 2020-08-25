@@ -47,7 +47,6 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #ifndef MESH_MERGE_MATERIAL_REPACK_H
 #define MESH_MERGE_MATERIAL_REPACK_H
 
-#include "thirdparty/xatlas/xatlas.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,6 +54,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include "thirdparty/xatlas/xatlas.h"
 
 #ifdef TOOLS_ENABLED
 #include "core/bind/core_bind.h"
