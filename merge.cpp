@@ -457,10 +457,10 @@ void MeshMergeMaterialRepack::_remove_nodes(Node *scene, Vector<Node *> &r_nodes
 		}
 		bool has_children = (node->get_child_count() - pending_deletion_count) > 0;
 		if (!is_root && is_base_spatial && !has_children) {
-			print_verbose("ResourceImporterScene extra node \"" + node->get_name() + "\" was removed");
-			node->queue_delete();
+			print_verbose("Extra node \"" + node->get_name() + "\" was removed");
+			node->get_parent()->remove_child(node);
 		} else {
-			print_verbose("ResourceImporterScene node \"" + node->get_name() + "\" was kept");
+			print_verbose("Scene node \"" + node->get_name() + "\" was kept");
 		}
 	}
 }
