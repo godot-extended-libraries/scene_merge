@@ -61,13 +61,11 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "scene/resources/surface_tool.h"
 
 void SceneMerge::merge(const String p_file, Node *p_root_node) {
-	PackedScene *scene = memnew(PackedScene);
-	scene->pack(p_root_node);
-	Node *root = scene->instance();
 	Ref<MeshMergeMaterialRepack> repack;
 	repack.instance();
-	root = repack->merge(root, p_root_node, p_file);
+	Node *root = repack->merge(p_root_node, p_file);
 	ERR_FAIL_COND(!root);
+	PackedScene *scene = memnew(PackedScene);
 	scene->pack(root);
 	ResourceSaver::save(p_file, scene);
 }
@@ -202,23 +200,25 @@ void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshMerge> &r_ite
 	}
 }
 
-Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String p_output_path) {
-	return _generate_list(p_root, p_original_root, p_output_path);
-}
+Node *MeshMergeMaterialRepack::merge(Node *p_root, String p_output_path) {
 
-Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_root, String p_output_path) {
-
-	MeshMergeState mesh_merge_state;
-	mesh_merge_state.root = p_root;
-	mesh_merge_state.original_root = p_original_root;
-	mesh_merge_state.output_path = p_output_path;
+	Ref<PackedScene> packed_scene;
+	packed_scene.instance();
+	packed_scene->pack(p_root);
+	MeshMergeState mesh_merge_state = {
+		Vector<MeshMerge>(),
+		Vector<MeshMerge>(),
+		packed_scene->instance(),
+		p_root,
+		p_output_path
+	};
 	mesh_merge_state.mesh_items.resize(1);
-	_find_all_mesh_instances(mesh_merge_state.mesh_items, p_root, p_root);
-	_find_all_animated_meshes(mesh_merge_state.mesh_items, p_root, p_root);
-
 	mesh_merge_state.original_mesh_items.resize(1);
-	_find_all_mesh_instances(mesh_merge_state.original_mesh_items, p_original_root, p_original_root);
-	_find_all_animated_meshes(mesh_merge_state.original_mesh_items, p_original_root, p_original_root);
+	_find_all_mesh_instances(mesh_merge_state.mesh_items, mesh_merge_state.root, mesh_merge_state.original_root);
+	_find_all_animated_meshes(mesh_merge_state.mesh_items, mesh_merge_state.root, mesh_merge_state.original_root);
+
+	_find_all_mesh_instances(mesh_merge_state.original_mesh_items, mesh_merge_state.root, mesh_merge_state.original_root);
+	_find_all_animated_meshes(mesh_merge_state.original_mesh_items, mesh_merge_state.root,  mesh_merge_state.original_root);
 	if (mesh_merge_state.original_mesh_items.size() != mesh_merge_state.mesh_items.size()) {
 		return p_root;
 	}
