@@ -202,6 +202,10 @@ void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshMerge> &r_ite
 	}
 }
 
+void MeshMergeMaterialRepack::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("merge", "root", "original_root", "output_path"), &MeshMergeMaterialRepack::merge);
+}
+
 Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String p_output_path) {
 	return _generate_list(p_root, p_original_root, p_output_path);
 }
@@ -226,7 +230,7 @@ Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_roo
 	for (int32_t items_i = 0; items_i < mesh_merge_state.mesh_items.size(); items_i++) {
 		p_root = _merge_list(mesh_merge_state, items_i);
 	}
-
+	_remove_empty_spatials(p_root);
 	return p_root;
 }
 
@@ -398,6 +402,67 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 
 	xatlas::Destroy(atlas);
 	return p_root;
+}
+
+void MeshMergeMaterialRepack::_mark_nodes(Node *p_current, Node *p_owner, Vector<Node *> &r_nodes) {
+	Array queue;
+	queue.push_back(p_current);
+	while (queue.size()) {
+		Node *node = queue.pop_back();
+		r_nodes.push_back(node);
+		for (int32_t i = 0; i < node->get_child_count(); i++) {
+			queue.push_back(node->get_child(i));
+		}
+	}
+}
+
+void MeshMergeMaterialRepack::_remove_empty_spatials(Node *scene) {
+	Vector<Node *> nodes;
+	_clean_animation_player(scene);
+	_mark_nodes(scene, scene, nodes);
+	nodes.invert();
+	_remove_nodes(scene, nodes);
+}
+
+void MeshMergeMaterialRepack::_clean_animation_player(Node *scene) {
+	for (int32_t i = 0; i < scene->get_child_count(); i++) {
+		AnimationPlayer *ap = Object::cast_to<AnimationPlayer>(scene->get_child(i));
+		if (!ap) {
+			continue;
+		}
+		List<StringName> animations;
+		ap->get_animation_list(&animations);
+		for (List<StringName>::Element *E = animations.front(); E; E = E->next()) {
+			Ref<Animation> animation = ap->get_animation(E->get());
+			for (int32_t k = 0; k < animation->get_track_count(); k++) {
+				NodePath path = animation->track_get_path(k);
+				if (!scene->has_node(path)) {
+					animation->remove_track(k);
+				}
+			}
+		}
+	}
+}
+
+void MeshMergeMaterialRepack::_remove_nodes(Node *scene, Vector<Node *> &r_nodes) {
+	for (int32_t node_i = 0; node_i < r_nodes.size(); node_i++) {
+		Node *node = r_nodes[node_i];
+		bool is_root = node == scene;
+		bool is_base_spatial = node->get_class_name() == Spatial().get_class_name();
+		int32_t pending_deletion_count = 0;
+		for (int32_t child_i = 0; child_i < node->get_child_count(); child_i++) {
+			if (node->get_child(child_i)->is_queued_for_deletion()) {
+				pending_deletion_count++;
+			}
+		}
+		bool has_children = (node->get_child_count() - pending_deletion_count) > 0;
+		if (!is_root && is_base_spatial && !has_children) {
+			print_verbose("ResourceImporterScene extra node \"" + node->get_name() + "\" was removed");
+			node->queue_delete();
+		} else {
+			print_verbose("ResourceImporterScene node \"" + node->get_name() + "\" was kept");
+		}
+	}
 }
 
 void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String texture_type) {

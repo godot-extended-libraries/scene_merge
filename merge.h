@@ -250,10 +250,12 @@ private:
 		String output_path;
 	};
 	Node *_merge_list(MeshMergeState p_mesh_merge_state, int p_index);
+	void _mark_nodes(Node *p_current, Node *p_owner, Vector<Node *> &r_nodes);
+	void _remove_empty_spatials(Node *scene);
+	void _clean_animation_player(Node *scene);
+	void _remove_nodes(Node *scene, Vector<Node *> &r_nodes);	
 protected:
-	static void _bind_methods() {
-		ClassDB::bind_method(D_METHOD("merge", "root", "original_root", "output_path"), &MeshMergeMaterialRepack::merge);
-	}
+	static void _bind_methods();
 public:
 	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
 };
