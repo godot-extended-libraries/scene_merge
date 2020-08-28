@@ -202,8 +202,7 @@ private:
 	struct MeshState {
 		Ref<Mesh> mesh;
 		NodePath path;
-		MeshInstance *mesh_instance = nullptr;
-		Node *replacement_node = nullptr;
+		MeshInstance *mesh_instance;
 		bool operator==(const MeshState &rhs) const;
 	};
 	struct MaterialImageCache {
@@ -249,9 +248,8 @@ private:
 		Node *root = nullptr;
 		Node *original_root = nullptr;
 		String output_path;
-		Vector<Node *> nodes;
 	};
-	void _merge_list(uint32_t p_index, MeshMergeState *p_mesh_merge_state);
+	Node *_merge_list(MeshMergeState p_mesh_merge_state, int p_index);
 
 protected:
 	static void _bind_methods() {

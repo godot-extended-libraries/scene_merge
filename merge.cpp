@@ -214,45 +214,26 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, String p_output_path) {
 	};
 	mesh_merge_state.mesh_items.resize(1);
 	mesh_merge_state.original_mesh_items.resize(1);
-	_find_all_mesh_instances(mesh_merge_state.mesh_items, mesh_merge_state.root, mesh_merge_state.root);
-	_find_all_animated_meshes(mesh_merge_state.mesh_items, mesh_merge_state.root, mesh_merge_state.root);
+	_find_all_mesh_instances(mesh_merge_state.mesh_items, mesh_merge_state.root, mesh_merge_state.original_root);
+	_find_all_animated_meshes(mesh_merge_state.mesh_items, mesh_merge_state.root, mesh_merge_state.original_root);
 
-	_find_all_mesh_instances(mesh_merge_state.original_mesh_items, mesh_merge_state.original_root, mesh_merge_state.original_root);
-	_find_all_animated_meshes(mesh_merge_state.original_mesh_items, mesh_merge_state.original_root,  mesh_merge_state.original_root);
+	_find_all_mesh_instances(mesh_merge_state.original_mesh_items, mesh_merge_state.root, mesh_merge_state.original_root);
+	_find_all_animated_meshes(mesh_merge_state.original_mesh_items, mesh_merge_state.root,  mesh_merge_state.original_root);
 	if (mesh_merge_state.original_mesh_items.size() != mesh_merge_state.mesh_items.size()) {
 		return p_root;
 	}
-	uint32_t elements = mesh_merge_state.mesh_items.size();
-	
-	for (int32_t node_i = 0; node_i <elements; node_i++) {
-		uint32_t current = node_i;
-		_merge_list(current, &mesh_merge_state);
+
+	for (int32_t items_i = 0; items_i < mesh_merge_state.mesh_items.size(); items_i++) {
+		p_root = _merge_list(mesh_merge_state, items_i);
 	}
 
-	for (int32_t node_i = 0; node_i < mesh_merge_state.nodes.size(); node_i++) {
-		Node *output = mesh_merge_state.nodes[node_i];
-		ERR_CONTINUE(!output);
-		p_root->add_child(output);
-		output->set_owner(p_root);
-	}
-		
-	for (int32_t node_i = 0; node_i < mesh_merge_state.mesh_items.size(); node_i++) {		 
-		Vector<MeshState> &mesh_state = mesh_merge_state.mesh_items.write[node_i].meshes;
-		for (int32_t mesh_i = 0; mesh_i < mesh_state.size(); mesh_i++) {
-			if (!mesh_state.write[mesh_i].replacement_node) {
-				continue;
-			} 
-			mesh_state.write[mesh_i].mesh_instance->replace_by(mesh_state.write[mesh_i].replacement_node);
-		}
-	}
 	return p_root;
 }
 
-//TODO Safety
-void MeshMergeMaterialRepack::_merge_list(uint32_t p_index, MeshMergeState *p_mesh_merge_state) {
-	Vector<MeshState> mesh_items = p_mesh_merge_state->mesh_items[p_index].meshes;
-	Node *p_root = p_mesh_merge_state->root;
-	Vector<MeshState>  original_mesh_items = p_mesh_merge_state->original_mesh_items[p_index].meshes;
+Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, int p_index) {
+	Vector<MeshState> mesh_items = p_mesh_merge_state.mesh_items[p_index].meshes;
+	Node *p_root = p_mesh_merge_state.root;
+	Vector<MeshState>  original_mesh_items = p_mesh_merge_state.original_mesh_items[p_index].meshes;
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
 	Ref<Material> empty_material;
@@ -292,7 +273,7 @@ void MeshMergeMaterialRepack::_merge_list(uint32_t p_index, MeshMergeState *p_me
 		uv_groups,
 		model_vertices,
 		p_root->get_name(),
-		p_mesh_merge_state->output_path,
+		p_mesh_merge_state.output_path,
 		pack_options,
 		atlas_lookup,
 		material_cache,
@@ -412,10 +393,11 @@ void MeshMergeMaterialRepack::_merge_list(uint32_t p_index, MeshMergeState *p_me
 	_generate_texture_atlas(state, "normal");
 	_generate_texture_atlas(state, "orm");
 	_generate_texture_atlas(state, "emission");
-	ERR_FAIL_COND(state.atlas->width <= 0 && state.atlas->height <= 0);
-	Node *mesh_instance = _output(state, p_index);
+	ERR_FAIL_COND_V(state.atlas->width <= 0 && state.atlas->height <= 0, state.p_root);
+	p_root = _output(state, p_index);
+
 	xatlas::Destroy(atlas);
-	p_mesh_merge_state->nodes.push_back(mesh_instance);
+	return p_root;
 }
 
 void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String texture_type) {
@@ -941,7 +923,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 			Transform xform = state.r_mesh_items[mesh_i].mesh_instance->get_transform();
 			spatial->set_transform(xform);
 			spatial->set_name(state.r_mesh_items[mesh_i].mesh_instance->get_name());
-			state.r_mesh_items.write[mesh_i].replacement_node = spatial;
+			state.r_mesh_items[mesh_i].mesh_instance->replace_by(spatial);
 		}
 	}
 	Ref<SurfaceTool> st_all;
@@ -1064,7 +1046,9 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	}
 	mi->set_transform(root_xform.affine_inverse());
 	array_mesh->surface_set_material(0, mat);
-	return mi;
+	state.p_root->add_child(mi);
+	mi->set_owner(state.p_root);
+	return state.p_root;
 }
 
 #ifdef TOOLS_ENABLED
