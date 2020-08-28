@@ -56,11 +56,14 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include <vector>
 #include "thirdparty/xatlas/xatlas.h"
 
-#ifdef TOOLS_ENABLED
 #include "core/bind/core_bind.h"
 #include "core/reference.h"
+
+#ifdef TOOLS_ENABLED
 #include "editor/editor_node.h"
 #include "editor/editor_plugin.h"
+#endif
+
 #include "modules/csg/csg_shape.h"
 #include "modules/gridmap/grid_map.h"
 #include "scene/3d/mesh_instance.h"
@@ -76,6 +79,7 @@ public:
 	void merge(const String p_file, Node *p_root_node);
 };
 
+#ifdef TOOLS_ENABLED
 class SceneMergePlugin : public EditorPlugin {
 
 	GDCLASS(SceneMergePlugin, EditorPlugin);
@@ -94,6 +98,7 @@ public:
 	SceneMergePlugin(EditorNode *p_node);
 	void _notification(int notification);
 };
+#endif
 
 #endif
 
@@ -229,16 +234,26 @@ private:
 	Ref<Image> dilate(Ref<Image> source_image);
 	void _find_all_animated_meshes(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
 	void _find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
-public:
-	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
 	Node *_generate_list(Node *p_root, Node *p_original_root, String p_output_path);
-	Node *_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> &original_mesh_items, Node *p_root, String p_output_path, int p_index);
 	void _generate_texture_atlas(MergeState &state, String texture_type);
 	Ref<Image> _get_source_texture(MergeState &state, Ref<SpatialMaterial> material, String texture_type);
 	void _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
 			xatlas::PackOptions &pack_options);
 	void scale_uvs_by_texture_dimension(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
 	void map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache);
-	Node *_output(MergeState &state, int p_count);
+	Node *_output(MergeState &state, int p_count);	
+	struct MeshMergeState {
+		Vector<MeshMerge> mesh_items;
+		Vector<MeshMerge> original_mesh_items;
+		Node *root = nullptr;
+		Node *original_root = nullptr;
+		String output_path;
+	};
+	Node *_merge_list(MeshMergeState p_mesh_merge_state, int p_index);
+protected:
+	static void _bind_methods() {
+		ClassDB::bind_method(D_METHOD("merge", "root", "original_root", "output_path"), &MeshMergeMaterialRepack::merge);
+	}
+public:
+	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
 };
-#endif

@@ -207,27 +207,33 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String
 }
 
 Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_root, String p_output_path) {
-	Vector<MeshMerge> mesh_items;
-	mesh_items.resize(1);
-	_find_all_mesh_instances(mesh_items, p_root, p_root);
-	_find_all_animated_meshes(mesh_items, p_root, p_root);
 
-	Vector<MeshMerge> original_mesh_items;
-	original_mesh_items.resize(1);
-	_find_all_mesh_instances(original_mesh_items, p_original_root, p_original_root);
-	_find_all_animated_meshes(original_mesh_items, p_original_root, p_original_root);
-	if (original_mesh_items.size() != mesh_items.size()) {
+	MeshMergeState mesh_merge_state;
+	mesh_merge_state.root = p_root;
+	mesh_merge_state.original_root = p_original_root;
+	mesh_merge_state.output_path = p_output_path;
+	mesh_merge_state.mesh_items.resize(1);
+	_find_all_mesh_instances(mesh_merge_state.mesh_items, p_root, p_root);
+	_find_all_animated_meshes(mesh_merge_state.mesh_items, p_root, p_root);
+
+	mesh_merge_state.original_mesh_items.resize(1);
+	_find_all_mesh_instances(mesh_merge_state.original_mesh_items, p_original_root, p_original_root);
+	_find_all_animated_meshes(mesh_merge_state.original_mesh_items, p_original_root, p_original_root);
+	if (mesh_merge_state.original_mesh_items.size() != mesh_merge_state.mesh_items.size()) {
 		return p_root;
 	}
 
-	for (int32_t items_i = 0; items_i < mesh_items.size(); items_i++) {
-		p_root = _merge_list(mesh_items.write[items_i].meshes, original_mesh_items.write[items_i].meshes, p_root, p_output_path, items_i);
+	for (int32_t items_i = 0; items_i < mesh_merge_state.mesh_items.size(); items_i++) {
+		p_root = _merge_list(mesh_merge_state, items_i);
 	}
 
 	return p_root;
 }
 
-Node *MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector<MeshState> &original_mesh_items, Node *p_root, String p_output_path, int p_index) {
+Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, int p_index) {
+	Vector<MeshState> mesh_items = p_mesh_merge_state.mesh_items[p_index].meshes;
+	Node *p_root = p_mesh_merge_state.root;
+	Vector<MeshState>  original_mesh_items = p_mesh_merge_state.original_mesh_items[p_index].meshes;
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
 	Ref<Material> empty_material;
@@ -267,7 +273,7 @@ Node *MeshMergeMaterialRepack::_merge_list(Vector<MeshState> &mesh_items, Vector
 		uv_groups,
 		model_vertices,
 		p_root->get_name(),
-		p_output_path,
+		p_mesh_merge_state.output_path,
 		pack_options,
 		atlas_lookup,
 		material_cache,
@@ -1096,7 +1102,7 @@ void SceneMergePlugin::_notification(int notification) {
 }
 
 SceneMergePlugin::SceneMergePlugin(EditorNode *p_node) {
-	editor = p_node;	
+	editor = p_node;
 	file_export_lib->set_title(TTR("Export Library"));
 	file_export_lib->set_mode(EditorFileDialog::MODE_SAVE_FILE);
 	file_export_lib->connect("file_selected", this, "_dialog_action");
