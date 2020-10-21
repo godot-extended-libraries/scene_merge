@@ -44,8 +44,6 @@ Copyright (c) 2013 Thekla, Inc
 Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 */
 
-#include "merge.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #define TEXBLEED_IMPLEMENTATION 1
@@ -59,6 +57,8 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "scene/resources/mesh_data_tool.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/surface_tool.h"
+
+#include "merge.h"
 
 void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	PackedScene *scene = memnew(PackedScene);
