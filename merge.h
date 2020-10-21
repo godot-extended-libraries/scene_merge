@@ -47,6 +47,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #ifndef MESH_MERGE_MATERIAL_REPACK_H
 #define MESH_MERGE_MATERIAL_REPACK_H
 
+#include "thirdparty/xatlas/xatlas.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,7 +55,6 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include <algorithm>
 #include <cmath>
 #include <vector>
-#include "thirdparty/xatlas/xatlas.h"
 
 #include "core/bind/core_bind.h"
 #include "core/reference.h"
@@ -234,14 +234,13 @@ private:
 	Ref<Image> dilate(Ref<Image> source_image);
 	void _find_all_animated_meshes(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
 	void _find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
-	Node *_generate_list(Node *p_root, Node *p_original_root, String p_output_path);
 	void _generate_texture_atlas(MergeState &state, String texture_type);
 	Ref<Image> _get_source_texture(MergeState &state, Ref<SpatialMaterial> material, String texture_type);
 	void _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
 			xatlas::PackOptions &pack_options);
 	void scale_uvs_by_texture_dimension(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
 	void map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache);
-	Node *_output(MergeState &state, int p_count);	
+	Node *_output(MergeState &state, int p_count);
 	struct MeshMergeState {
 		Vector<MeshMerge> mesh_items;
 		Vector<MeshMerge> original_mesh_items;
@@ -253,9 +252,11 @@ private:
 	void _mark_nodes(Node *p_current, Node *p_owner, Vector<Node *> &r_nodes);
 	void _remove_empty_spatials(Node *scene);
 	void _clean_animation_player(Node *scene);
-	void _remove_nodes(Node *scene, Vector<Node *> &r_nodes);	
+	void _remove_nodes(Node *scene, Vector<Node *> &r_nodes);
+
 protected:
 	static void _bind_methods();
+
 public:
 	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
 };

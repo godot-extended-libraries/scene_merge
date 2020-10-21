@@ -207,10 +207,6 @@ void MeshMergeMaterialRepack::_bind_methods() {
 }
 
 Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String p_output_path) {
-	return _generate_list(p_root, p_original_root, p_output_path);
-}
-
-Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_root, String p_output_path) {
 
 	MeshMergeState mesh_merge_state;
 	mesh_merge_state.root = p_root;
@@ -237,7 +233,7 @@ Node *MeshMergeMaterialRepack::_generate_list(Node *p_root, Node *p_original_roo
 Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, int p_index) {
 	Vector<MeshState> mesh_items = p_mesh_merge_state.mesh_items[p_index].meshes;
 	Node *p_root = p_mesh_merge_state.root;
-	Vector<MeshState>  original_mesh_items = p_mesh_merge_state.original_mesh_items[p_index].meshes;
+	Vector<MeshState> original_mesh_items = p_mesh_merge_state.original_mesh_items[p_index].meshes;
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
 	Ref<Material> empty_material;
