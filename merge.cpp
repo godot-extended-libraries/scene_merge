@@ -372,7 +372,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			Ref<Image> img;
 			img.instance();
 			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
-			Color c = Color(0.5f, 0.5f, 0.0f);
+			Color c = Color(0.5f, 0.5f, 1.0f);
 			img->fill(c);
 			Ref<ImageTexture> tex;
 			tex.instance();
