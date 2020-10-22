@@ -1055,8 +1055,25 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	}
 	Map<String, Ref<Image> >::Element *N = state.texture_atlas.find("normal");
 	if (N && !N->get()->empty()) {
-		Ref<Image> img = dilate(N->get());
-		img->compress(compress_mode, Image::COMPRESS_SOURCE_NORMAL);
+		Ref<Image> img = N->get();
+		{
+			// Code for uncompressing RG normal maps
+			img->convert(Image::FORMAT_RGBA8);
+			img->lock();
+			for (int32_t y = 0; y < img->get_height(); y++) {
+				for (int32_t x = 0; x < img->get_width(); x++) {
+					Color c = img->get_pixel(x, y);
+					Vector2 red_green = Vector2(c.r, c.g);
+					red_green = red_green * Vector2(2.0f, 2.0f) - Vector2(1.0f, 1.0f);
+					float blue = 1.0f - red_green.dot(red_green);
+					blue = MAX(0.0f, blue);
+					c.b = Math::sqrt(blue);
+					img->set_pixel(x, y, c);
+				}
+			}
+			img->unlock();
+		}
+		img = dilate(img);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
 		path = base_dir.plus_file(path.get_basename().get_file() + "_normal");
