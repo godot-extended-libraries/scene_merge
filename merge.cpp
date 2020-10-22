@@ -1108,7 +1108,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	mi->set_transform(root_xform.affine_inverse());
 	array_mesh->surface_set_material(0, mat);
 	state.p_root->add_child(mi);
-	if (state.p_root != state.p_root) {
+	if (mi != state.p_root) {
 		mi->set_owner(state.p_root);
 	}
 	return state.p_root;
