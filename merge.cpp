@@ -46,7 +46,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include <stdio.h>
 #include <stdlib.h>
-#define TEXBLEED_IMPLEMENTATION 1
+
 #include "thirdparty/misc/rjm_texbleed.h"
 
 #include "core/bind/core_bind.h"
