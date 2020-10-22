@@ -54,6 +54,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "core/math/vector2.h"
 #include "core/math/vector3.h"
 #include "core/os/os.h"
+#include "scene/animation/animation_player.h"
 #include "scene/resources/mesh_data_tool.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/surface_tool.h"
@@ -279,11 +280,14 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 		material_cache,
 		texture_atlas
 	};
-
+#ifdef TOOLS_ENABLED
 	EditorProgress progress_scene_merge("gen_get_source_material", TTR("Get source material"), state.material_cache.size());
 	int step = 0;
+#endif
 	for (int32_t material_cache_i = 0; material_cache_i < state.material_cache.size(); material_cache_i++) {
+#ifdef TOOLS_ENABLED
 		step++;
+#endif
 		Ref<SpatialMaterial> material = state.material_cache[material_cache_i];
 		if (material.is_null()) {
 			continue;
@@ -386,7 +390,9 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 		cache.orm_img = _get_source_texture(state, material, "orm");
 		cache.emission_img = _get_source_texture(state, material, "emission");
 		state.material_image_cache[material_cache_i] = cache;
+#ifdef TOOLS_ENABLED
 		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
+#endif
 	}
 	_generate_texture_atlas(state, "albedo");
 	_generate_texture_atlas(state, "emission");
@@ -466,9 +472,10 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	atlas_img.instance();
 	atlas_img->create(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
 	// Rasterize chart triangles.
-
+#ifdef TOOLS_ENABLED
 	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Atlas"), state.atlas->meshCount);
 	int step = 0;
+#endif
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
 		for (uint32_t chart_i = 0; chart_i < mesh.chartCount; chart_i++) {
@@ -509,8 +516,10 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				args.atlasData->unlock();
 			}
 		}
+#ifdef TOOLS_ENABLED
 		progress_texture_atlas.step(TTR("Process Mesh for Atlas: ") + texture_type + " (" + itos(step) + "/" + itos(state.atlas->meshCount) + ")", step);
 		step++;
+#endif
 	}
 	state.texture_atlas.insert(texture_type, atlas_img);
 }
