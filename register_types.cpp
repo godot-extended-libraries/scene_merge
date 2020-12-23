@@ -29,7 +29,7 @@
 /*************************************************************************/
 
 #include "register_types.h"
-#include "core/engine.h"
+#include "core/config/engine.h"
 #include "merge.h"
 
 void register_scene_merge_types() {
