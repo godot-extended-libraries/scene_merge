@@ -796,6 +796,7 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 	pack_options.bruteForce = true;
 	pack_options.blockAlign = true;
 	pack_options.resolution = 2048;
+	xatlas::ComputeCharts(atlas);
 	xatlas::PackCharts(atlas, pack_options);
 }
 
