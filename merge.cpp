@@ -1100,7 +1100,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 }
 
 #ifdef TOOLS_ENABLED
-void SceneMergePlugin::merge(Variant p_user_data) {
+void SceneMergePlugin::merge() {
 	file_export_lib_merge->set_pressed(false);
 	List<String> extensions;
 	extensions.push_back("tscn");

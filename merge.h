@@ -89,7 +89,7 @@ class SceneMergePlugin : public EditorPlugin {
 	EditorFileDialog *file_export_lib = memnew(EditorFileDialog);
 	Ref<SceneMerge> scene_optimize;
 	void _dialog_action(String p_file);
-	void merge(Variant p_user_data);
+	void merge();
 
 protected:
 	static void _bind_methods();
