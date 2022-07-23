@@ -486,8 +486,7 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				img = state.material_image_cache[chart.material].emission_img;
 			}
 			if (img.is_null()) {
-				img.instantiate();
-				img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+				continue;
 			}
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
 			img->convert(Image::FORMAT_RGBA8);
@@ -502,8 +501,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 					const uint32_t index = mesh.indexArray[chart.faceArray[face_i] * 3 + l];
 					const xatlas::Vertex &vertex = mesh.vertexArray[index];
 					v[l] = Vector2(vertex.uv[0], vertex.uv[1]);
-					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / img->get_width();
-					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / img->get_height();
+					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x;
+					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y;
 				}
 				Triangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
@@ -982,7 +981,8 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		for (uint32_t v = 0; v < mesh.vertexCount; v++) {
 			const xatlas::Vertex vertex = mesh.vertexArray[v];
 			const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
-			st->set_uv(Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height));
+			Vector2 uv = Vector2(vertex.uv[0], vertex.uv[1]);
+			st->set_uv(uv);
 			st->set_normal(sourceVertex.normal);
 			st->set_color(Color(1.0f, 1.0f, 1.0f));
 			st->add_vertex(sourceVertex.pos);
