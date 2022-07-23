@@ -1086,7 +1086,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	}
 	mi->set_transform(root_xform.affine_inverse());
 	array_mesh->surface_set_material(0, mat);
-	state.p_root->add_child(mi);
+	state.p_root->add_child(mi, true);
 	if (mi != state.p_root) {
 		mi->set_owner(state.p_root);
 	}
@@ -1124,7 +1124,7 @@ void SceneMergePlugin::_dialog_action(String p_file) {
 			EditorNode::get_singleton()->show_accept(TTR("Can't load scene for merging!"), TTR("OK"));
 			return;
 		} else {
-			node->add_child(scene->instantiate());
+			node->add_child(scene->instantiate(), true);
 		}
 	}
 	scene_optimize->merge(p_file, node);
@@ -1143,8 +1143,8 @@ SceneMergePlugin::SceneMergePlugin() {
 	file_export_lib->set_file_mode(EditorFileDialog::FILE_MODE_SAVE_FILE);
 	file_export_lib->connect("file_selected", callable_mp(this, &SceneMergePlugin::_dialog_action));
 	file_export_lib_merge->set_text(TTR("Merge With Existing"));
-	file_export_lib->get_vbox()->add_child(file_export_lib_merge);
-	EditorNode::get_singleton()->get_gui_base()->add_child(file_export_lib);
+	file_export_lib->get_vbox()->add_child(file_export_lib_merge, true);
+	EditorNode::get_singleton()->get_gui_base()->add_child(file_export_lib, true);
 	file_export_lib->set_title(TTR("Merge Scene"));
 	EditorNode::get_singleton()->add_tool_menu_item("Merge Scene", callable_mp(this, &SceneMergePlugin::merge));
 }
