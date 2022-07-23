@@ -486,7 +486,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				img = state.material_image_cache[chart.material].emission_img;
 			}
 			if (img.is_null()) {
-				continue;
+				img.instantiate();
+				img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
 			}
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
 			img->convert(Image::FORMAT_RGBA8);
@@ -501,8 +502,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 					const uint32_t index = mesh.indexArray[chart.faceArray[face_i] * 3 + l];
 					const xatlas::Vertex &vertex = mesh.vertexArray[index];
 					v[l] = Vector2(vertex.uv[0], vertex.uv[1]);
-					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / MAX(texture_minimum_side, img->get_width());
-					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / MAX(texture_minimum_side, img->get_height());
+					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / img->get_width();
+					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / img->get_height();
 				}
 				Triangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
@@ -514,17 +515,15 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 		step++;
 #endif
 	}
+	atlas_img->generate_mipmaps();
 	state.texture_atlas.insert(texture_type, atlas_img);
 }
 
-Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const Ref<BaseMaterial3D> material, String texture_type) {
+Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<BaseMaterial3D> material, String texture_type) {
 	int32_t width = texture_minimum_side;
 	int32_t height = texture_minimum_side;
 	if (material.is_null()) {
-		Ref<Image> img;
-		img.instantiate();
-		img->create(width, height, false, Image::FORMAT_RGBA8);
-		return img;
+		material = Ref<StandardMaterial3D>(memnew(StandardMaterial3D));
 	}
 	Ref<Texture2D> ao_texture = material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION);
 	Ref<Image> ao_img;
