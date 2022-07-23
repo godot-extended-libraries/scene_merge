@@ -29,15 +29,25 @@
 /*************************************************************************/
 
 #include "register_types.h"
-#include "core/config/engine.h"
+
+#include "core/object/class_db.h"
+
 #include "merge.h"
 
-void register_scene_merge_types() {
+void initialize_scene_merge_module(ModuleInitializationLevel p_level) {
+
 #ifdef TOOLS_ENABLED
-	ClassDB::register_class<SceneMerge>();
-	EditorPlugins::add_by_type<SceneMergePlugin>();
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		ClassDB::APIType prev_api = ClassDB::get_current_api();
+		ClassDB::set_current_api(ClassDB::API_EDITOR);
+
+ 		ClassDB::register_class<SceneMerge>();
+		EditorPlugins::add_by_type<SceneMergePlugin>();
+
+		ClassDB::set_current_api(prev_api);
+	}
 #endif
 }
 
-void unregister_scene_merge_types() {
+void uninitialize_scene_merge_module(ModuleInitializationLevel p_level)  {
 }

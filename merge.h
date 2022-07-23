@@ -47,17 +47,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #ifndef MESH_MERGE_MATERIAL_REPACK_H
 #define MESH_MERGE_MATERIAL_REPACK_H
 
-#include "thirdparty/xatlas/xatlas.h"
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <algorithm>
-#include <cmath>
-#include <vector>
-
-#include "core/core_bind.h"
-#include "core/object/reference.h"
+#include "core/object/ref_counted.h"
 
 #ifdef TOOLS_ENABLED
 #include "editor/editor_node.h"
@@ -69,9 +59,9 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "scene/3d/mesh_instance_3d.h"
 #include "scene/main/node.h"
 
-class SceneMerge : public Reference {
+class SceneMerge : public RefCounted {
 private:
-	GDCLASS(SceneMerge, Reference);
+	GDCLASS(SceneMerge, RefCounted);
 
 	void _dialog_action(String p_file);
 
@@ -80,11 +70,10 @@ public:
 };
 
 #ifdef TOOLS_ENABLED
+#include "editor/editor_file_dialog.h"
 class SceneMergePlugin : public EditorPlugin {
 
 	GDCLASS(SceneMergePlugin, EditorPlugin);
-
-	EditorNode *editor;
 	CheckBox *file_export_lib_merge = memnew(CheckBox);
 	EditorFileDialog *file_export_lib = memnew(EditorFileDialog);
 	Ref<SceneMerge> scene_optimize;
@@ -95,35 +84,23 @@ protected:
 	static void _bind_methods();
 
 public:
-	SceneMergePlugin(EditorNode *p_node);
+	SceneMergePlugin();
+	~SceneMergePlugin() {		
+		EditorNode::get_singleton()->remove_tool_menu_item("Merge Scene");
+	}
 	void _notification(int notification);
 };
 #endif
 
 #endif
 
-#ifdef _MSC_VER
-#define FOPEN(_file, _filename, _mode)                            \
-	{                                                             \
-		if (fopen_s(&_file, _filename, _mode) != 0) _file = NULL; \
-	}
-#define STRCAT(_dest, _size, _src) strcat_s(_dest, _size, _src);
-#define STRCPY(_dest, _size, _src) strcpy_s(_dest, _size, _src);
-#define STRICMP _stricmp
-#else
-#define FOPEN(_file, _filename, _mode) _file = fopen(_filename, _mode)
-#include <string.h>
-#include <strings.h>
-#define STRCAT(_dest, _size, _src) strcat(_dest, _src);
-#define STRCPY(_dest, _size, _src) strcpy(_dest, _src);
-#define STRICMP strcasecmp
-#endif
-
 #include "core/math/vector2.h"
-#include "core/object/reference.h"
+#include "core/object/ref_counted.h"
 #include "scene/3d/mesh_instance_3d.h"
 
-class MeshMergeMaterialRepack : public Reference {
+#include "thirdparty/xatlas/xatlas.h"
+
+class MeshMergeMaterialRepack : public RefCounted {
 private:
 	struct TextureData {
 		uint16_t width;
@@ -222,8 +199,8 @@ private:
 		const xatlas::PackOptions &pack_options;
 		Vector<AtlasLookupTexel> &atlas_lookup;
 		Vector<Ref<Material> > &material_cache;
-		Map<String, Ref<Image> > texture_atlas;
-		Map<int32_t, MaterialImageCache> material_image_cache;
+		HashMap<String, Ref<Image> > texture_atlas;
+		HashMap<int32_t, MaterialImageCache> material_image_cache;
 	};
 	const int32_t texture_minimum_side = 512;
 	struct MeshMerge {

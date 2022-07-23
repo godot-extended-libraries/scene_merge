@@ -5,9 +5,6 @@ Import('env_modules')
 
 env_scene_optimize = env_modules.Clone()
 env_scene_optimize.Prepend(CPPPATH=['#thirdparty/mesh_optimizer'])
-
-if (not env.msvc):
-    env_scene_optimize.Append(CXXFLAGS=['-std=c++11'])
     
 env_thirdparty = env_scene_optimize.Clone()
 env_thirdparty.disable_warnings()
