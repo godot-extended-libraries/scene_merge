@@ -554,12 +554,16 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 	}
 	Ref<Texture2D> emission_texture = material->get_texture(BaseMaterial3D::TEXTURE_EMISSION);
 	Ref<Image> emission_img;
+	if (emission_texture.is_valid()) {
+		emission_img = emission_texture->get_image();
+	}
 	if (albedo_img.is_valid() && !albedo_img->is_empty()) {
 		width = MAX(width, albedo_img->get_width());
 		height = MAX(height, albedo_img->get_height());
 	}
-	if (emission_texture.is_valid()) {
-		emission_img = emission_texture->get_image();
+	if (emission_texture.is_valid() && !emission_img->is_empty()) {
+		width = MAX(width, emission_img->get_width());
+		height = MAX(height, emission_img->get_height());
 	}
 	if (ao_img.is_valid() && !ao_img->is_empty()) {
 		width = MAX(width, ao_img->get_width());
@@ -572,10 +576,6 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 	if (roughness_img.is_valid() && !roughness_img->is_empty()) {
 		width = MAX(width, roughness_img->get_width());
 		height = MAX(height, roughness_img->get_height());
-	}
-	if (emission_img.is_valid() && !emission_img->is_empty()) {
-		width = MAX(width, emission_img->get_width());
-		height = MAX(height, emission_img->get_height());
 	}
 	if (normal_img.is_valid() && !normal_img->is_empty()) {
 		width = MAX(width, normal_img->get_width());
@@ -732,15 +732,16 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 			color_mul = emission_col * emission_energy;
 			color_add = Color(0, 0, 0);
 		}
-		if (emission_img.is_valid()) {
-			for (int32_t y = 0; y < img->get_height(); y++) {
-				for (int32_t x = 0; x < img->get_width(); x++) {
-					Color c = emission_img->get_pixel(x, y);
-					c.r = c.r * color_mul.r + color_add.r;
-					c.g = c.g * color_mul.g + color_add.g;
-					c.b = c.b * color_mul.b + color_add.b;
-					img->set_pixel(x, y, c);
+		for (int32_t y = 0; y < img->get_height(); y++) {
+			for (int32_t x = 0; x < img->get_width(); x++) {
+				Color c;
+				if (emission_img.is_valid()) {
+					c = emission_img->get_pixel(x, y);
 				}
+				c.r = c.r * color_mul.r + color_add.r;
+				c.g = c.g * color_mul.g + color_add.g;
+				c.b = c.b * color_mul.b + color_add.b;
+				img->set_pixel(x, y, c);
 			}
 		}
 	}
@@ -1028,9 +1029,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Ref<core_bind::Directory> directory;
 		directory.instantiate();
 		path += "_" + itos(p_count) + ".res";
-		Ref<ImageTexture> tex;
-		tex.instantiate();
-		tex->create_from_image(img);
+		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 		ResourceSaver::save(path, tex);
 		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_feature(BaseMaterial3D::FEATURE_EMISSION, true);
