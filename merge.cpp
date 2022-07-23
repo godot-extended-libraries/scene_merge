@@ -382,9 +382,9 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 		}
 		MaterialImageCache cache;
 		cache.albedo_img = _get_source_texture(state, material, "albedo");
+		cache.emission_img = _get_source_texture(state, material, "emission");
 		cache.normal_img = _get_source_texture(state, material, "normal");
 		cache.orm_img = _get_source_texture(state, material, "orm");
-		cache.emission_img = _get_source_texture(state, material, "emission");
 		state.material_image_cache[material_cache_i] = cache;
 #ifdef TOOLS_ENABLED
 		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
@@ -394,7 +394,6 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 	_generate_texture_atlas(state, "emission");
 	_generate_texture_atlas(state, "normal");
 	_generate_texture_atlas(state, "orm");
-	_generate_texture_atlas(state, "emission");
 	ERR_FAIL_COND_V(state.atlas->width <= 0 && state.atlas->height <= 0, state.p_root);
 	p_root = _output(state, p_index);
 
