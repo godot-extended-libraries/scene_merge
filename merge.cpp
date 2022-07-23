@@ -258,14 +258,6 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 	int32_t num_surfaces = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		for (int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
-			Array mesh = mesh_items[mesh_i].mesh->surface_get_arrays(j);
-			if (mesh.is_empty()) {
-				continue;
-			}
-			Vector<Vector3> vertices = mesh[ArrayMesh::ARRAY_VERTEX];
-			if (!vertices.size()) {
-				continue;
-			}
 			num_surfaces++;
 		}
 	}
@@ -752,10 +744,12 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 		for (int32_t j = 0; j < r_meshes[mesh_i].mesh->get_surface_count(); j++) {
 			Array mesh = r_meshes[mesh_i].mesh->surface_get_arrays(j);
 			if (mesh.is_empty()) {
+				mesh_count++;
 				continue;
 			}
 			Array indices = mesh[ArrayMesh::ARRAY_INDEX];
 			if (!indices.size()) {
+				mesh_count++;
 				continue;
 			}
 			xatlas::UvMeshDecl meshDecl;
@@ -807,11 +801,16 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 		for (int32_t surface_i = 0; surface_i < mesh_items[mesh_i].mesh->get_surface_count(); surface_i++) {
 			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
 			Array mesh = array_mesh->surface_get_arrays(surface_i);
+			Vector<ModelVertex> model_vertices;
 			if (mesh.is_empty()) {
+				mesh_count++;
+				r_model_vertices.write[mesh_count] = model_vertices;
 				continue;
 			}
 			Array vertices = mesh[ArrayMesh::ARRAY_VERTEX];
 			if (vertices.size() == 0) {
+				mesh_count++;
+				r_model_vertices.write[mesh_count] = model_vertices;
 				continue;
 			}
 			Vector<Vector3> vertex_arr = mesh[Mesh::ARRAY_VERTEX];
@@ -820,7 +819,6 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 			Vector<int32_t> index_arr = mesh[Mesh::ARRAY_INDEX];
 			Vector<Plane> tangent_arr = mesh[Mesh::ARRAY_TANGENT];
 			Transform3D xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();
-			Vector<ModelVertex> model_vertices;
 			model_vertices.resize(vertex_arr.size());
 			for (int32_t vertex_i = 0; vertex_i < vertex_arr.size(); vertex_i++) {
 				ModelVertex vertex;
@@ -869,7 +867,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 				const Ref<Material> material = index_to_material.get(index);
 				if (material.is_null()) {
 					uvs.resize(0);
-					break;
+					continue;
 				}
 				Ref<BaseMaterial3D> Node3D_material = material;
 				if (Node3D_material.is_null()) {
@@ -927,14 +925,7 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
-		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
-			Array mesh = array_mesh->surface_get_arrays(j);
-			Array uvs = mesh[ArrayMesh::ARRAY_TEX_UV];
-			if (!uvs.size()) {
-				array_mesh->lightmap_unwrap(Transform3D(), 2.0f, Mesh::ARRAY_TEX_UV);
-				break;
-			}
-		}
+		array_mesh->lightmap_unwrap(Transform3D(), 2.0f, Mesh::ARRAY_TEX_UV);
 
 		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
 			Array mesh = array_mesh->surface_get_arrays(j);
