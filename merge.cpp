@@ -306,9 +306,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			img->create(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			img->fill(material->get_albedo());
 			material->set_albedo(Color(1.0f, 1.0f, 1.0f));
-			Ref<ImageTexture> tex;
-			tex.instantiate();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, tex);
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_EMISSION).is_null()) {
@@ -334,9 +332,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			c.g = c.g * color_mul.g + color_add.g;
 			c.b = c.b * color_mul.b + color_add.b;
 			material->set_emission(c);
-			Ref<ImageTexture> tex;
-			tex.instantiate();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_texture(BaseMaterial3D::TEXTURE_EMISSION, tex);
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_ROUGHNESS).is_null()) {
@@ -347,9 +343,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			Color c = Color(roughness, roughness, roughness);
 			material->set_roughness(1.0f);
 			img->fill(c);
-			Ref<ImageTexture> tex;
-			tex.instantiate();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_roughness_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
 			material->set_texture(BaseMaterial3D::TEXTURE_ROUGHNESS, tex);
 		}
@@ -361,9 +355,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			Color c = Color(metallic, metallic, metallic);
 			material->set_metallic(1.0f);
 			img->fill(c);
-			Ref<ImageTexture> tex;
-			tex.instantiate();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_metallic_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
 			material->set_texture(BaseMaterial3D::TEXTURE_METALLIC, tex);
 		}
@@ -374,9 +366,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			float ao = 1.0f;
 			Color c = Color(ao, ao, ao);
 			img->fill(c);
-			Ref<ImageTexture> tex;
-			tex.instantiate();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
 			material->set_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION, tex);
 		}
@@ -386,9 +376,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			img->create(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			Color c = Color(0.5f, 0.5f, 1.0f);
 			img->fill(c);
-			Ref<ImageTexture> tex;
-			tex.instantiate();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING, true);
 			material->set_texture(BaseMaterial3D::TEXTURE_NORMAL, tex);
 		}
@@ -744,16 +732,15 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 			color_mul = emission_col * emission_energy;
 			color_add = Color(0, 0, 0);
 		}
-		for (int32_t y = 0; y < img->get_height(); y++) {
-			for (int32_t x = 0; x < img->get_width(); x++) {
-				Color c;
-				if (emission_img.is_valid()) {
-					c = emission_img->get_pixel(x, y);
+		if (emission_img.is_valid()) {
+			for (int32_t y = 0; y < img->get_height(); y++) {
+				for (int32_t x = 0; x < img->get_width(); x++) {
+					Color c = emission_img->get_pixel(x, y);
+					c.r = c.r * color_mul.r + color_add.r;
+					c.g = c.g * color_mul.g + color_add.g;
+					c.b = c.b * color_mul.b + color_add.b;
+					img->set_pixel(x, y, c);
 				}
-				c.r = c.r * color_mul.r + color_add.r;
-				c.g = c.g * color_mul.g + color_add.g;
-				c.b = c.b * color_mul.b + color_add.b;
-				img->set_pixel(x, y, c);
 			}
 		}
 	}
@@ -1026,9 +1013,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Ref<core_bind::Directory> directory;
 		directory.instantiate();
 		path += "_" + itos(p_count) + ".res";
-		Ref<ImageTexture> tex;
-		tex.instantiate();
-		tex->create_from_image(img);
+		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 		ResourceSaver::save(path, tex);
 		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, res);
@@ -1061,9 +1046,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Ref<core_bind::Directory> directory;
 		directory.instantiate();
 		path += "_" + itos(p_count) + ".res";
-		Ref<ImageTexture> tex;
-		tex.instantiate();
-		tex->create_from_image(img);
+		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 		ResourceSaver::save(path, tex);
 		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING, true);
@@ -1079,9 +1062,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Ref<core_bind::Directory> directory;
 		directory.instantiate();
 		path += "_" + itos(p_count) + ".res";
-		Ref<ImageTexture> tex;
-		tex.instantiate();
-		tex->create_from_image(img);
+		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 		ResourceSaver::save(path, tex);
 		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
