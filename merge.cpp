@@ -519,10 +519,10 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 }
 
 Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<BaseMaterial3D> material, String texture_type) {
-	int32_t width = texture_minimum_side;
-	int32_t height = texture_minimum_side;
+	int32_t width = 0;
+	int32_t height = 0;
 	if (material.is_null()) {
-		material = Ref<StandardMaterial3D>(memnew(StandardMaterial3D));
+		return Ref<Image>();
 	}
 	Ref<Texture2D> ao_texture = material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION);
 	Ref<Image> ao_img;
@@ -878,8 +878,8 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 				const Ref<Texture2D> tex = Node3D_material->get_texture(BaseMaterial3D::TextureParam::TEXTURE_ALBEDO);
 				uvs.write[vertex_i] = r_model_vertices[mesh_count][vertex_i].uv;
 				if (tex.is_valid()) {
-					uvs.write[vertex_i].x *= (float)MAX(texture_minimum_side, tex->get_width());
-					uvs.write[vertex_i].y *= (float)MAX(texture_minimum_side, tex->get_height());
+					uvs.write[vertex_i].x *= tex->get_width();
+					uvs.write[vertex_i].y *= tex->get_height();
 				}
 			}
 			uv_groups.push_back(uvs);
@@ -981,7 +981,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		for (uint32_t v = 0; v < mesh.vertexCount; v++) {
 			const xatlas::Vertex vertex = mesh.vertexArray[v];
 			const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
-			Vector2 uv = Vector2(vertex.uv[0], vertex.uv[1]);
+			Vector2 uv = Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height);
 			st->set_uv(uv);
 			st->set_normal(sourceVertex.normal);
 			st->set_color(Color(1.0f, 1.0f, 1.0f));
