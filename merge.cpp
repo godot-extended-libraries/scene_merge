@@ -499,7 +499,7 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				img = state.material_image_cache[chart.material].emission_img;
 			}
 			if (img.is_null()) {
-				img->create(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+				continue;
 			}
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
 			img->convert(Image::FORMAT_RGBA8);
