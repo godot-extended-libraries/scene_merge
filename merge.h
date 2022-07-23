@@ -202,7 +202,6 @@ private:
 		HashMap<String, Ref<Image> > texture_atlas;
 		HashMap<int32_t, MaterialImageCache> material_image_cache;
 	};
-	const int32_t texture_minimum_side = 512;
 	struct MeshMerge {
 		Vector<MeshState> meshes;
 		int vertex_count = 0;

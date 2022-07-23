@@ -116,61 +116,53 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 
 void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner) {
 	MeshInstance3D *mi = cast_to<MeshInstance3D>(p_current_node);
+	bool is_valid = false;
 	if (mi) {
-		Ref<ArrayMesh> array_mesh = mi->get_mesh();
-		if (array_mesh.is_valid()) {
-			bool has_blends = false;
-			bool has_bones = false;
-			bool has_transparency = false;
-			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
-				Array array = array_mesh->surface_get_arrays(surface_i);
-				Array bones = array[ArrayMesh::ARRAY_BONES];
-				has_bones |= bones.size() != 0;
-				has_blends |= array_mesh->get_blend_shape_count() != 0;
-				Ref<BaseMaterial3D> base_mat = array_mesh->surface_get_material(surface_i);
-				if (base_mat.is_valid()) {
-					Ref<Image> albedo_img = base_mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
-					has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
-				}
-				if (has_blends || has_bones || has_transparency) {
-					break;
-				}
+		is_valid = true;
+	}
+	if (is_valid && mi->get_mesh().is_valid()) {
+		bool has_blends = false;
+		bool has_bones = false;
+		bool has_transparency = false;
+		Ref<Mesh> array_mesh = mi->get_mesh();
+		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
+			Array array = array_mesh->surface_get_arrays(surface_i);
+			Array bones = array[ArrayMesh::ARRAY_BONES];
+			has_bones |= bones.size() != 0;
+			has_blends |= array_mesh->get_blend_shape_count() != 0;
+			Ref<BaseMaterial3D> base_mat = array_mesh->surface_get_material(surface_i);
+			if (base_mat.is_valid()) {
+				Ref<Image> albedo_img = base_mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
+				has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
 			}
-			if (!has_blends && !has_bones && !has_transparency) {
-				for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
-					Array array = array_mesh->surface_get_arrays(surface_i);
-					if (r_items[r_items.size() - 1].vertex_count > 65536) {
-						MeshMerge new_mesh;
-						r_items.push_back(new_mesh);
-					}
-					Array vertexes = array[ArrayMesh::ARRAY_VERTEX];
-					Array bones = array[ArrayMesh::ARRAY_BONES];
-					Array uvs = array[ArrayMesh::ARRAY_TEX_UV];
-					has_bones |= bones.size() != 0;
-					has_blends |= array_mesh->get_blend_shape_count() != 0;
-					Ref<BaseMaterial3D> base_mat = array_mesh->surface_get_material(surface_i);
-					if (base_mat.is_valid()) {
-						Ref<Image> albedo_img = base_mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
-						has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
-					}
-					if (!has_blends && !has_bones && !has_transparency) {
-						MeshState mesh_state;
-						Ref<SurfaceTool> st;
-						st.instantiate();
-						st->create_from_triangle_arrays(array);
-						Ref<ArrayMesh> split_mesh = st->commit();
-						split_mesh->surface_set_material(0, array_mesh->surface_get_material(surface_i));
-						mesh_state.mesh = split_mesh;
-						if (mi->is_inside_tree()) {
-							mesh_state.path = mi->get_path();
-						}
-						mesh_state.mesh_instance = mi;
-						MeshMerge &mesh = r_items.write[r_items.size() - 1];
-						mesh.vertex_count += vertexes.size();
-						mesh.meshes.push_back(mesh_state);
-					}
-				}
+			Array vertexes = array[ArrayMesh::ARRAY_VERTEX];
+			Array uvs = array[ArrayMesh::ARRAY_TEX_UV];
+			if (base_mat.is_valid()) {
+				Ref<Image> albedo_img = base_mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
+				has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
 			}
+			MeshState mesh_state;
+			if (has_blends || has_bones || has_transparency) {
+				break;
+			}
+			if (r_items[r_items.size() - 1].vertex_count > 65536) {
+				MeshMerge new_mesh;
+				r_items.push_back(new_mesh);
+				continue;
+			}
+			Ref<SurfaceTool> st;
+			st.instantiate();
+			st->create_from_triangle_arrays(array);
+			Ref<ArrayMesh> split_mesh = st->commit();
+			split_mesh->surface_set_material(0, array_mesh->surface_get_material(surface_i));
+			mesh_state.mesh = split_mesh;
+			if (mi->is_inside_tree()) {
+				mesh_state.path = mi->get_path();
+			}
+			mesh_state.mesh_instance = mi;
+			MeshMerge &mesh = r_items.write[r_items.size() - 1];
+			mesh.vertex_count += vertexes.size();
+			mesh.meshes.push_back(mesh_state);
 		}
 	}
 	for (int32_t child_i = 0; child_i < p_current_node->get_child_count(); child_i++) {
@@ -744,11 +736,15 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 		for (int32_t j = 0; j < r_meshes[mesh_i].mesh->get_surface_count(); j++) {
 			Array mesh = r_meshes[mesh_i].mesh->surface_get_arrays(j);
 			if (mesh.is_empty()) {
+				xatlas::UvMeshDecl meshDecl;
+				xatlas::AddUvMesh(atlas, meshDecl);
 				mesh_count++;
 				continue;
 			}
 			Array indices = mesh[ArrayMesh::ARRAY_INDEX];
 			if (!indices.size()) {
+				xatlas::UvMeshDecl meshDecl;
+				xatlas::AddUvMesh(atlas, meshDecl);
 				mesh_count++;
 				continue;
 			}
@@ -841,10 +837,14 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 		for (int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
 			Array mesh = mesh_items[mesh_i].mesh->surface_get_arrays(j);
 			if (mesh.is_empty()) {
+				uv_groups.push_back(Vector<Vector2>());
+				mesh_count++;
 				continue;
 			}
 			Vector<Vector3> vertices = mesh[ArrayMesh::ARRAY_VERTEX];
 			if (vertices.size() == 0) {
+				mesh_count++;
+				uv_groups.push_back(Vector<Vector2>());
 				continue;
 			}
 			Vector<Vector2> uvs;
