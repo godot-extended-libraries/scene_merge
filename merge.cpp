@@ -822,6 +822,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 				if (uv_arr.size()) {
 					vertex.uv = uv_arr[vertex_i];
 				}
+				vertex.normal = normal_arr[vertex_i];
 				model_vertices.write[vertex_i] = vertex;
 			}
 			r_model_vertices.write[mesh_count] = model_vertices;
