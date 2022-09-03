@@ -78,7 +78,7 @@ void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	root = repack->merge(root, p_root_node, p_file);
 	ERR_FAIL_COND(!root);
 	scene->pack(root);
-	ResourceSaver::save(p_file, scene);
+	ResourceSaver::save(scene, p_file);
 }
 
 bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float) {
@@ -300,7 +300,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			img->fill(material->get_emission());
 
 			Color emission_col = material->get_emission();
-			float emission_energy = material->get_emission_energy();
+			float emission_energy = material->get_emission_energy_multiplier();
 			Color color_mul;
 			Color color_add;
 			if (material->get_emission_operator() == BaseMaterial3D::EMISSION_OP_ADD) {
@@ -703,7 +703,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<B
 		}
 	} else if (texture_type == "emission") {
 		Color emission_col = material->get_emission();
-		float emission_energy = material->get_emission_energy();
+		float emission_energy = material->get_emission_energy_multiplier();
 		Color color_mul;
 		Color color_add;
 		if (material->get_emission_operator() == BaseMaterial3D::EMISSION_OP_ADD) {
@@ -925,7 +925,7 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
-		array_mesh->lightmap_unwrap(Transform3D(), 2.0f, Mesh::ARRAY_TEX_UV);
+		array_mesh->lightmap_unwrap(Transform3D(), 2.0f, true);
 
 		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
 			Array mesh = array_mesh->surface_get_arrays(j);
@@ -986,7 +986,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Ref<ArrayMesh> array_mesh = st->commit();
 		st_all->append_from(array_mesh, 0, Transform3D());
 	}
-	Ref<StandardMaterial3D> mat;
+	Ref<ORMMaterial3D> mat;
 	mat.instantiate();
 	mat->set_name("Atlas");
 	HashMap<String, Ref<Image> >::Iterator A = state.texture_atlas.find("albedo");
@@ -999,12 +999,12 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		img->compress(compress_mode, Image::COMPRESS_SOURCE_SRGB);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
-		path = base_dir.plus_file(path.get_basename().get_file() + "_albedo");
+		path = base_dir.path_to_file(path.get_basename().get_file() + "_albedo");
 		Ref<core_bind::Directory> directory;
 		directory.instantiate();
 		path += "_" + itos(p_count) + ".res";
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-		ResourceSaver::save(path, tex);
+		ResourceSaver::save(tex, path);
 		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, res);
 	}
@@ -1014,12 +1014,12 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		img->compress(compress_mode);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
-		path = base_dir.plus_file(path.get_basename().get_file() + "_emission");
+		path = base_dir.path_join(path.get_basename().get_file() + "_emission");
 		Ref<core_bind::Directory> directory;
 		directory.instantiate();
 		path += "_" + itos(p_count) + ".res";
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-		ResourceSaver::save(path, tex);
+		ResourceSaver::save(tex, path);
 		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_feature(BaseMaterial3D::FEATURE_EMISSION, true);
 		mat->set_texture(BaseMaterial3D::TEXTURE_EMISSION, res);
@@ -1030,12 +1030,12 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		img->compress(compress_mode, Image::COMPRESS_SOURCE_NORMAL);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
-		path = base_dir.plus_file(path.get_basename().get_file() + "_normal");
+		path = base_dir.path_join(path.get_basename().get_file() + "_normal");
 		Ref<core_bind::Directory> directory;
 		directory.instantiate();
 		path += "_" + itos(p_count) + ".res";
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-		ResourceSaver::save(path, tex);
+		ResourceSaver::save(tex, path);
 		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING, true);
 		mat->set_texture(BaseMaterial3D::TEXTURE_NORMAL, res);
@@ -1046,12 +1046,12 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		img->compress(compress_mode);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
-		path = base_dir.plus_file(path.get_basename().get_file() + "_orm");
+		path = base_dir.path_join(path.get_basename().get_file() + "_orm");
 		Ref<core_bind::Directory> directory;
 		directory.instantiate();
 		path += "_" + itos(p_count) + ".res";
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-		ResourceSaver::save(path, tex);
+		ResourceSaver::save(tex, path);
 		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
 		mat->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_RED);
