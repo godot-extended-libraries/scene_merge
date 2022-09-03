@@ -470,7 +470,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				img = state.material_image_cache[chart.material].emission_img;
 			}
 			if (img.is_null()) {
-				continue;
+				img.instantiate();
+				img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
 			}
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
 			img->convert(Image::FORMAT_RGBA8);
@@ -485,8 +486,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 					const uint32_t index = mesh.indexArray[chart.faceArray[face_i] * 3 + l];
 					const xatlas::Vertex &vertex = mesh.vertexArray[index];
 					v[l] = Vector2(vertex.uv[0], vertex.uv[1]);
-					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x;
-					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y;
+					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / img->get_width();
+					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / img->get_height();
 				}
 				Triangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
