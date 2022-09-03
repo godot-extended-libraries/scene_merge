@@ -819,10 +819,6 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 			for (int32_t vertex_i = 0; vertex_i < vertex_arr.size(); vertex_i++) {
 				ModelVertex vertex;
 				vertex.pos = xform.xform(vertex_arr[vertex_i]);
-				if (normal_arr.size()) {
-					Vector3 normal = normal_arr[vertex_i];
-					vertex.normal = xform.basis.xform(normal).normalized();
-				}
 				if (uv_arr.size()) {
 					vertex.uv = uv_arr[vertex_i];
 				}
