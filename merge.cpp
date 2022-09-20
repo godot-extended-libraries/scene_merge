@@ -59,9 +59,6 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include "thirdparty/misc/rjm_texbleed.h"
 #include "thirdparty/xatlas/xatlas.h"
-// #include <stdarg.h>
-// #include <stdio.h>
-// #include <stdlib.h>
 #include <time.h>
 #include <algorithm>
 #include <cmath>
@@ -780,7 +777,7 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 	pack_options.bilinear = true;
 	pack_options.padding = 16;
 	pack_options.texelsPerUnit = 0.0f;
-	pack_options.bruteForce = true;
+	pack_options.bruteForce = false;
 	pack_options.blockAlign = true;
 	pack_options.resolution = 2048;
 	xatlas::ComputeCharts(atlas);
@@ -893,7 +890,6 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 	int32_t width = target_image->get_size().x;
 	const int32_t bytes_in_pixel = 4;
 	pixels.resize(height * width * bytes_in_pixel);
-	;
 	for (int32_t y = 0; y < height; y++) {
 		for (int32_t x = 0; x < width; x++) {
 			int32_t pixel_index = x + (width * y);
@@ -1000,8 +996,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
 		path = base_dir.path_to_file(path.get_basename().get_file() + "_albedo");
-		Ref<core_bind::Directory> directory;
-		directory.instantiate();
+		Ref<DirAccess> directory = DirAccess::create(DirAccess::AccessType::ACCESS_FILESYSTEM);
 		path += "_" + itos(p_count) + ".res";
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 		ResourceSaver::save(tex, path);
@@ -1015,8 +1010,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
 		path = base_dir.path_join(path.get_basename().get_file() + "_emission");
-		Ref<core_bind::Directory> directory;
-		directory.instantiate();
+		Ref<DirAccess> directory = DirAccess::create(DirAccess::AccessType::ACCESS_FILESYSTEM);
 		path += "_" + itos(p_count) + ".res";
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 		ResourceSaver::save(tex, path);
@@ -1031,8 +1025,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
 		path = base_dir.path_join(path.get_basename().get_file() + "_normal");
-		Ref<core_bind::Directory> directory;
-		directory.instantiate();
+		Ref<DirAccess> directory = DirAccess::create(DirAccess::AccessType::ACCESS_FILESYSTEM);
 		path += "_" + itos(p_count) + ".res";
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 		ResourceSaver::save(tex, path);
@@ -1047,8 +1040,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
 		path = base_dir.path_join(path.get_basename().get_file() + "_orm");
-		Ref<core_bind::Directory> directory;
-		directory.instantiate();
+		Ref<DirAccess> directory = DirAccess::create(DirAccess::AccessType::ACCESS_FILESYSTEM);
 		path += "_" + itos(p_count) + ".res";
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 		ResourceSaver::save(tex, path);
@@ -1093,6 +1085,7 @@ void SceneMergePlugin::merge() {
 	}
 	file_export_lib->popup_centered_ratio();
 	Node *root = EditorNode::get_singleton()->get_tree()->get_edited_scene_root();
+	ERR_FAIL_NULL(root);
 	String filename = String(root->get_scene_file_path().get_file().get_basename());
 	if (filename.is_empty()) {
 		filename = root->get_name();
