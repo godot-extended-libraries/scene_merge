@@ -1297,10 +1297,10 @@ bool MeshMergeMaterialRepack::Triangle::drawAA(SamplingCallback cb, void *param)
 	const float BK_OUTSIDE = -sqrtf(BK_SIZE * BK_SIZE / 2.0f);
 	float minx, miny, maxx, maxy;
 	// Bounding rectangle
-	minx = floorf(std::max(std::min(v1.x, std::min(v2.x, v3.x)), 0.0f));
-	miny = floorf(std::max(std::min(v1.y, std::min(v2.y, v3.y)), 0.0f));
-	maxx = ceilf(std::max(v1.x, std::max(v2.x, v3.x)));
-	maxy = ceilf(std::max(v1.y, std::max(v2.y, v3.y)));
+	minx = floorf(MAX(MIN(v1.x, MIN(v2.x, v3.x)), 0.0f));
+	miny = floorf(MAX(MIN(v1.y, MIN(v2.y, v3.y)), 0.0f));
+	maxx = ceilf(MAX(v1.x, MAX(v2.x, v3.x)));
+	maxy = ceilf(MAX(v1.y, MAX(v2.y, v3.y)));
 	// There's no reason to align the blocks to the viewport, instead we align them to the origin of the triangle bounds.
 	minx = floorf(minx);
 	miny = floorf(miny);
