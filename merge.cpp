@@ -282,18 +282,14 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			continue;
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO).is_null()) {
-			Ref<Image> img;
-			img.instantiate();
-			img->create(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			img->fill(material->get_albedo());
 			material->set_albedo(Color(1.0f, 1.0f, 1.0f));
 			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, tex);
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_EMISSION).is_null()) {
-			Ref<Image> img;
-			img.instantiate();
-			img->create(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			img->fill(material->get_emission());
 
 			Color emission_col = material->get_emission();
@@ -317,9 +313,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			material->set_texture(BaseMaterial3D::TEXTURE_EMISSION, tex);
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_ROUGHNESS).is_null()) {
-			Ref<Image> img;
-			img.instantiate();
-			img->create(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			float roughness = material->get_roughness();
 			Color c = Color(roughness, roughness, roughness);
 			material->set_roughness(1.0f);
@@ -329,9 +323,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			material->set_texture(BaseMaterial3D::TEXTURE_ROUGHNESS, tex);
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_METALLIC).is_null()) {
-			Ref<Image> img;
-			img.instantiate();
-			img->create(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			float metallic = material->get_metallic();
 			Color c = Color(metallic, metallic, metallic);
 			material->set_metallic(1.0f);
@@ -341,9 +333,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			material->set_texture(BaseMaterial3D::TEXTURE_METALLIC, tex);
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION).is_null()) {
-			Ref<Image> img;
-			img.instantiate();
-			img->create(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			float ao = 1.0f;
 			Color c = Color(ao, ao, ao);
 			img->fill(c);
@@ -352,9 +342,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			material->set_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION, tex);
 		}
 		if (!material->get_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING)) {
-			Ref<Image> img;
-			img.instantiate();
-			img->create(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			Color c = Color(0.5f, 0.5f, 1.0f);
 			img->fill(c);
 			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
@@ -444,9 +432,7 @@ void MeshMergeMaterialRepack::_remove_nodes(Node *scene, Vector<Node *> &r_nodes
 }
 
 void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String texture_type) {
-	Ref<Image> atlas_img;
-	atlas_img.instantiate();
-	atlas_img->create(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
+	Ref<Image> atlas_img = Image::create_empty(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
 	// Rasterize chart triangles.
 #ifdef TOOLS_ENABLED
 	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Atlas"), state.atlas->meshCount);
@@ -467,8 +453,7 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				img = state.material_image_cache[chart.material].emission_img;
 			}
 			if (img.is_null()) {
-				img.instantiate();
-				img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+				img = Image::create_empty(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
 			}
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
 			img->convert(Image::FORMAT_RGBA8);
@@ -608,12 +593,10 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<B
 		}
 		emission_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 	}
-	Ref<Image> img;
-	img.instantiate();
-	img->create(width, height, false, Image::FORMAT_RGBA8);
+	Ref<Image> img = Image::create_empty(width, height, false, Image::FORMAT_RGBA8);
 	Ref<Texture2D> tex;
 	if (texture_type == "orm") {
-		img->create(width, height, false, Image::FORMAT_RGB8);
+		tex = Image::create_empty(width, height, false, Image::FORMAT_RGB8);
 		for (int32_t y = 0; y < img->get_height(); y++) {
 			for (int32_t x = 0; x < img->get_width(); x++) {
 				Color orm;
