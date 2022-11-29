@@ -57,6 +57,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "modules/csg/csg_shape.h"
 #include "modules/gridmap/grid_map.h"
 #include "scene/3d/mesh_instance_3d.h"
+#include "scene/gui/check_box.h"
 #include "scene/main/node.h"
 
 class SceneMerge : public RefCounted {
@@ -85,7 +86,7 @@ protected:
 
 public:
 	SceneMergePlugin();
-	~SceneMergePlugin() {		
+	~SceneMergePlugin() {
 		EditorNode::get_singleton()->remove_tool_menu_item("Merge Scene");
 	}
 	void _notification(int notification);
