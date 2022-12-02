@@ -27,6 +27,10 @@
 /* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
+#ifndef SCENE_MERGE_REGISTER_TYPES_H
+#define SCENE_MERGE_REGISTER_TYPES_H
+#include "modules/register_module_types.h"
 
-void register_scene_merge_types();
-void unregister_scene_merge_types();
+void initialize_scene_merge_module(ModuleInitializationLevel p_level);
+void uninitialize_scene_merge_module(ModuleInitializationLevel p_level);
+#endif

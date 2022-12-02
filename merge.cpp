@@ -44,35 +44,38 @@ Copyright (c) 2013 Thekla, Inc
 Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "thirdparty/misc/rjm_texbleed.h"
-
 #include "core/core_bind.h"
 #include "core/io/image.h"
 #include "core/math/vector2.h"
 #include "core/math/vector3.h"
 #include "core/os/os.h"
+#include "editor/editor_file_dialog.h"
+#include "editor/editor_file_system.h"
 #include "scene/3d/node_3d.h"
 #include "scene/animation/animation_player.h"
 #include "scene/resources/mesh_data_tool.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/surface_tool.h"
 
+#include "thirdparty/misc/rjm_texbleed.h"
+#include "thirdparty/xatlas/xatlas.h"
+#include <time.h>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 #include "merge.h"
 
 void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	PackedScene *scene = memnew(PackedScene);
 	scene->pack(p_root_node);
-	Node *root = scene->instance();
+	Node *root = scene->instantiate();
 	Ref<MeshMergeMaterialRepack> repack;
-	repack.instance();
+	repack.instantiate();
 	root = repack->merge(root, p_root_node, p_file);
 	ERR_FAIL_COND(!root);
 	scene->pack(root);
-	ResourceSaver::save(p_file, scene);
+	ResourceSaver::save(scene, p_file);
 }
 
 bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float) {
@@ -110,61 +113,53 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 
 void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner) {
 	MeshInstance3D *mi = cast_to<MeshInstance3D>(p_current_node);
+	bool is_valid = false;
 	if (mi) {
-		Ref<ArrayMesh> array_mesh = mi->get_mesh();
-		if (array_mesh.is_valid()) {
-			bool has_blends = false;
-			bool has_bones = false;
-			bool has_transparency = false;
-			for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
-				Array array = array_mesh->surface_get_arrays(surface_i);
-				Array bones = array[ArrayMesh::ARRAY_BONES];
-				has_bones |= bones.size() != 0;
-				has_blends |= array_mesh->get_blend_shape_count() != 0;
-				Ref<BaseMaterial3D> base_mat = array_mesh->surface_get_material(surface_i);
-				if (base_mat.is_valid()) {
-					Ref<Image> albedo_img = base_mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
-					has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
-				}
-				if (has_blends || has_bones || has_transparency) {
-					break;
-				}
+		is_valid = true;
+	}
+	if (is_valid && mi->get_mesh().is_valid()) {
+		bool has_blends = false;
+		bool has_bones = false;
+		bool has_transparency = false;
+		Ref<Mesh> array_mesh = mi->get_mesh();
+		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
+			Array array = array_mesh->surface_get_arrays(surface_i);
+			Array bones = array[ArrayMesh::ARRAY_BONES];
+			has_bones |= bones.size() != 0;
+			has_blends |= array_mesh->get_blend_shape_count() != 0;
+			Ref<BaseMaterial3D> base_mat = array_mesh->surface_get_material(surface_i);
+			if (base_mat.is_valid()) {
+				Ref<Image> albedo_img = base_mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
+				has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
 			}
-			if (!has_blends && !has_bones && !has_transparency) {
-				for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
-					Array array = array_mesh->surface_get_arrays(surface_i);
-					if (r_items[r_items.size() - 1].vertex_count > 65536) {
-						MeshMerge new_mesh;
-						r_items.push_back(new_mesh);
-					}
-					Array vertexes = array[ArrayMesh::ARRAY_VERTEX];
-					Array bones = array[ArrayMesh::ARRAY_BONES];
-					Array uvs = array[ArrayMesh::ARRAY_TEX_UV];
-					has_bones |= bones.size() != 0;
-					has_blends |= array_mesh->get_blend_shape_count() != 0;
-					Ref<BaseMaterial3D> base_mat = array_mesh->surface_get_material(surface_i);
-					if (base_mat.is_valid()) {
-						Ref<Image> albedo_img = base_mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
-						has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
-					}
-					if (!has_blends && !has_bones && !has_transparency) {
-						MeshState mesh_state;
-						Ref<SurfaceTool> st;
-						st.instance();
-						st->create_from_triangle_arrays(array);
-						Ref<ArrayMesh> split_mesh = st->commit();
-						split_mesh->surface_set_material(0, array_mesh->surface_get_material(surface_i));
-						mesh_state.mesh = split_mesh;
-						if (mi->is_inside_tree()) {
-							mesh_state.path = mi->get_path();
-						}
-						mesh_state.mesh_instance = mi;
-						MeshMerge &mesh = r_items.write[r_items.size() - 1];
-						mesh.vertex_count += vertexes.size();
-						mesh.meshes.push_back(mesh_state);
-					}
-				}
+			Array vertexes = array[ArrayMesh::ARRAY_VERTEX];
+			Array uvs = array[ArrayMesh::ARRAY_TEX_UV];
+			if (base_mat.is_valid()) {
+				Ref<Image> albedo_img = base_mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
+				has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
 			}
+			MeshState mesh_state;
+			if (has_blends || has_bones || has_transparency) {
+				break;
+			}
+			if (r_items[r_items.size() - 1].vertex_count > 65536) {
+				MeshMerge new_mesh;
+				r_items.push_back(new_mesh);
+				continue;
+			}
+			Ref<SurfaceTool> st;
+			st.instantiate();
+			st->create_from_triangle_arrays(array);
+			Ref<ArrayMesh> split_mesh = st->commit();
+			split_mesh->surface_set_material(0, array_mesh->surface_get_material(surface_i));
+			mesh_state.mesh = split_mesh;
+			if (mi->is_inside_tree()) {
+				mesh_state.path = mi->get_path();
+			}
+			mesh_state.mesh_instance = mi;
+			MeshMerge &mesh = r_items.write[r_items.size() - 1];
+			mesh.vertex_count += vertexes.size();
+			mesh.meshes.push_back(mesh_state);
 		}
 	}
 	for (int32_t child_i = 0; child_i < p_current_node->get_child_count(); child_i++) {
@@ -177,7 +172,7 @@ void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshMerge> &r_ite
 	if (ap) {
 		List<StringName> animation_names;
 		ap->get_animation_list(&animation_names);
-		Map<String, MeshState> paths;
+		HashMap<String, MeshState> paths;
 		for (int32_t mesh_merge_i = 0; mesh_merge_i < r_items.size(); mesh_merge_i++) {
 			MeshMerge &mesh_merg = r_items.write[mesh_merge_i];
 			for (int32_t i = 0; i < mesh_merg.meshes.size(); i++) {
@@ -187,13 +182,13 @@ void MeshMergeMaterialRepack::_find_all_animated_meshes(Vector<MeshMerge> &r_ite
 			}
 			for (int32_t anim_i = 0; anim_i < animation_names.size(); anim_i++) {
 				Ref<Animation> anim = ap->get_animation(animation_names[anim_i]);
-				for (Map<String, MeshState>::Element *E = paths.front(); E; E = E->next()) {
-					String path = E->key();
+				for (KeyValue<String, MeshMergeMaterialRepack::MeshState> kv : paths) {
+					String path = kv.key;
 					for (int32_t track_i = 0; track_i < anim->get_track_count(); track_i++) {
 						NodePath anim_path = anim->track_get_path(track_i);
 						String anim_path_string = anim_path;
-						if (path.begins_with(anim_path_string) && mesh_merg.meshes.size() && mesh_merg.meshes.find(E->get()) != -1) {
-							mesh_merg.meshes.erase(E->get());
+						if (path.begins_with(anim_path_string) && mesh_merg.meshes.size() && mesh_merg.meshes.find(kv.value) != -1) {
+							mesh_merg.meshes.erase(kv.value);
 						}
 					}
 				}
@@ -252,14 +247,6 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 	int32_t num_surfaces = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		for (int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
-			Array mesh = mesh_items[mesh_i].mesh->surface_get_arrays(j);
-			if (mesh.empty()) {
-				continue;
-			}
-			Vector<Vector3> vertices = mesh[ArrayMesh::ARRAY_VERTEX];
-			if (!vertices.size()) {
-				continue;
-			}
 			num_surfaces++;
 		}
 	}
@@ -267,7 +254,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 	Vector<AtlasLookupTexel> atlas_lookup;
 	_generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, material_cache, pack_options);
 	atlas_lookup.resize(atlas->width * atlas->height);
-	Map<String, Ref<Image> > texture_atlas;
+	HashMap<String, Ref<Image> > texture_atlas;
 
 	MergeState state = {
 		p_root, atlas,
@@ -295,24 +282,18 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			continue;
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO).is_null()) {
-			Ref<Image> img;
-			img.instance();
-			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			img->fill(material->get_albedo());
 			material->set_albedo(Color(1.0f, 1.0f, 1.0f));
-			Ref<ImageTexture> tex;
-			tex.instance();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, tex);
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_EMISSION).is_null()) {
-			Ref<Image> img;
-			img.instance();
-			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			img->fill(material->get_emission());
 
 			Color emission_col = material->get_emission();
-			float emission_energy = material->get_emission_energy();
+			float emission_energy = material->get_emission_energy_multiplier();
 			Color color_mul;
 			Color color_add;
 			if (material->get_emission_operator() == BaseMaterial3D::EMISSION_OP_ADD) {
@@ -328,69 +309,51 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 			c.g = c.g * color_mul.g + color_add.g;
 			c.b = c.b * color_mul.b + color_add.b;
 			material->set_emission(c);
-			Ref<ImageTexture> tex;
-			tex.instance();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_texture(BaseMaterial3D::TEXTURE_EMISSION, tex);
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_ROUGHNESS).is_null()) {
-			Ref<Image> img;
-			img.instance();
-			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			float roughness = material->get_roughness();
 			Color c = Color(roughness, roughness, roughness);
 			material->set_roughness(1.0f);
 			img->fill(c);
-			Ref<ImageTexture> tex;
-			tex.instance();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_roughness_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
 			material->set_texture(BaseMaterial3D::TEXTURE_ROUGHNESS, tex);
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_METALLIC).is_null()) {
-			Ref<Image> img;
-			img.instance();
-			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			float metallic = material->get_metallic();
 			Color c = Color(metallic, metallic, metallic);
 			material->set_metallic(1.0f);
 			img->fill(c);
-			Ref<ImageTexture> tex;
-			tex.instance();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_metallic_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
 			material->set_texture(BaseMaterial3D::TEXTURE_METALLIC, tex);
 		}
 		if (material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION).is_null()) {
-			Ref<Image> img;
-			img.instance();
-			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			float ao = 1.0f;
 			Color c = Color(ao, ao, ao);
 			img->fill(c);
-			Ref<ImageTexture> tex;
-			tex.instance();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
 			material->set_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION, tex);
 		}
 		if (!material->get_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING)) {
-			Ref<Image> img;
-			img.instance();
-			img->create(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			Color c = Color(0.5f, 0.5f, 1.0f);
 			img->fill(c);
-			Ref<ImageTexture> tex;
-			tex.instance();
-			tex->create_from_image(img);
+			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 			material->set_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING, true);
 			material->set_texture(BaseMaterial3D::TEXTURE_NORMAL, tex);
 		}
 		MaterialImageCache cache;
 		cache.albedo_img = _get_source_texture(state, material, "albedo");
+		cache.emission_img = _get_source_texture(state, material, "emission");
 		cache.normal_img = _get_source_texture(state, material, "normal");
 		cache.orm_img = _get_source_texture(state, material, "orm");
-		cache.emission_img = _get_source_texture(state, material, "emission");
 		state.material_image_cache[material_cache_i] = cache;
 #ifdef TOOLS_ENABLED
 		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
@@ -400,7 +363,6 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 	_generate_texture_atlas(state, "emission");
 	_generate_texture_atlas(state, "normal");
 	_generate_texture_atlas(state, "orm");
-	_generate_texture_atlas(state, "emission");
 	ERR_FAIL_COND_V(state.atlas->width <= 0 && state.atlas->height <= 0, state.p_root);
 	p_root = _output(state, p_index);
 
@@ -412,7 +374,7 @@ void MeshMergeMaterialRepack::_mark_nodes(Node *p_current, Node *p_owner, Vector
 	Array queue;
 	queue.push_back(p_current);
 	while (queue.size()) {
-		Node *node = queue.pop_back();
+		Node *node = cast_to<Node>(queue.pop_back());
 		r_nodes.push_back(node);
 		for (int32_t i = 0; i < node->get_child_count(); i++) {
 			queue.push_back(node->get_child(i));
@@ -424,7 +386,7 @@ void MeshMergeMaterialRepack::_remove_empty_Node3Ds(Node *scene) {
 	Vector<Node *> nodes;
 	_clean_animation_player(scene);
 	_mark_nodes(scene, scene, nodes);
-	nodes.invert();
+	nodes.reverse();
 	_remove_nodes(scene, nodes);
 }
 
@@ -470,9 +432,7 @@ void MeshMergeMaterialRepack::_remove_nodes(Node *scene, Vector<Node *> &r_nodes
 }
 
 void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String texture_type) {
-	Ref<Image> atlas_img;
-	atlas_img.instance();
-	atlas_img->create(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
+	Ref<Image> atlas_img = Image::create_empty(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
 	// Rasterize chart triangles.
 #ifdef TOOLS_ENABLED
 	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Atlas"), state.atlas->meshCount);
@@ -492,7 +452,9 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 			} else if (texture_type == "emission") {
 				img = state.material_image_cache[chart.material].emission_img;
 			}
-			ERR_CONTINUE(img.is_null());
+			if (img.is_null()) {
+				img = Image::create_empty(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
+			}
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
 			img->convert(Image::FORMAT_RGBA8);
 			SetAtlasTexelArgs args;
@@ -506,8 +468,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 					const uint32_t index = mesh.indexArray[chart.faceArray[face_i] * 3 + l];
 					const xatlas::Vertex &vertex = mesh.vertexArray[index];
 					v[l] = Vector2(vertex.uv[0], vertex.uv[1]);
-					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / MAX(texture_minimum_side, img->get_width());
-					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / MAX(texture_minimum_side, img->get_height());
+					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / img->get_width();
+					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / img->get_height();
 				}
 				Triangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
@@ -519,74 +481,72 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 		step++;
 #endif
 	}
+	atlas_img->generate_mipmaps();
 	state.texture_atlas.insert(texture_type, atlas_img);
 }
 
-Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const Ref<BaseMaterial3D> material, String texture_type) {
-	int32_t width = texture_minimum_side;
-	int32_t height = texture_minimum_side;
+Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<BaseMaterial3D> material, String texture_type) {
+	int32_t width = 0;
+	int32_t height = 0;
 	if (material.is_null()) {
-		Ref<Image> img;
-		img.instance();
-		img->create(width, height, false, Image::FORMAT_RGBA8);
-		return img;
+		return Ref<Image>();
 	}
 	Ref<Texture2D> ao_texture = material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION);
 	Ref<Image> ao_img;
 	if (ao_texture.is_valid()) {
-		ao_img = ao_texture->get_data();
+		ao_img = ao_texture->get_image();
 	}
 	Ref<Texture2D> metallic_texture = material->get_texture(BaseMaterial3D::TEXTURE_METALLIC);
 	Ref<Image> metallic_img;
 	if (metallic_texture.is_valid()) {
-		metallic_img = metallic_texture->get_data();
+		metallic_img = metallic_texture->get_image();
 	}
 	Ref<Texture2D> roughness_texture = material->get_texture(BaseMaterial3D::TEXTURE_ROUGHNESS);
 	Ref<Image> roughness_img;
 	if (roughness_texture.is_valid()) {
-		roughness_img = roughness_texture->get_data();
+		roughness_img = roughness_texture->get_image();
 	}
 	Ref<Texture2D> albedo_texture = material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
 	Ref<Image> albedo_img;
 	if (albedo_texture.is_valid()) {
-		albedo_img = albedo_texture->get_data();
+		albedo_img = albedo_texture->get_image();
 	}
 	Ref<Texture2D> normal_texture = material->get_texture(BaseMaterial3D::TEXTURE_NORMAL);
 	Ref<Image> normal_img;
 	if (normal_texture.is_valid()) {
-		normal_img = normal_texture->get_data();
+		normal_img = normal_texture->get_image();
 	}
 	Ref<Texture2D> emission_texture = material->get_texture(BaseMaterial3D::TEXTURE_EMISSION);
 	Ref<Image> emission_img;
-	if (albedo_img.is_valid() && !albedo_img->empty()) {
+	if (emission_texture.is_valid()) {
+		emission_img = emission_texture->get_image();
+	}
+	if (albedo_img.is_valid() && !albedo_img->is_empty()) {
 		width = MAX(width, albedo_img->get_width());
 		height = MAX(height, albedo_img->get_height());
 	}
-	if (emission_texture.is_valid()) {
-		emission_img = emission_texture->get_data();
-	}
-	if (ao_img.is_valid() && !ao_img->empty()) {
-		width = MAX(width, ao_img->get_width());
-		height = MAX(height, ao_img->get_height());
-	}
-	if (metallic_img.is_valid() && !metallic_img->empty()) {
-		width = MAX(width, metallic_img->get_width());
-		height = MAX(height, metallic_img->get_height());
-	}
-	if (roughness_img.is_valid() && !roughness_img->empty()) {
-		width = MAX(width, roughness_img->get_width());
-		height = MAX(height, roughness_img->get_height());
-	}
-	if (emission_img.is_valid() && !emission_img->empty()) {
+	if (emission_texture.is_valid() && !emission_img->is_empty()) {
 		width = MAX(width, emission_img->get_width());
 		height = MAX(height, emission_img->get_height());
 	}
-	if (normal_img.is_valid() && !normal_img->empty()) {
+	if (ao_img.is_valid() && !ao_img->is_empty()) {
+		width = MAX(width, ao_img->get_width());
+		height = MAX(height, ao_img->get_height());
+	}
+	if (metallic_img.is_valid() && !metallic_img->is_empty()) {
+		width = MAX(width, metallic_img->get_width());
+		height = MAX(height, metallic_img->get_height());
+	}
+	if (roughness_img.is_valid() && !roughness_img->is_empty()) {
+		width = MAX(width, roughness_img->get_width());
+		height = MAX(height, roughness_img->get_height());
+	}
+	if (normal_img.is_valid() && !normal_img->is_empty()) {
 		width = MAX(width, normal_img->get_width());
 		height = MAX(height, normal_img->get_height());
 	}
 	if (albedo_img.is_valid()) {
-		if (!albedo_img->empty()) {
+		if (!albedo_img->is_empty()) {
 			if (albedo_img->is_compressed()) {
 				albedo_img->decompress();
 			}
@@ -594,7 +554,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		albedo_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 	}
 	if (ao_img.is_valid()) {
-		if (!ao_img->empty()) {
+		if (!ao_img->is_empty()) {
 			if (ao_img->is_compressed()) {
 				ao_img->decompress();
 			}
@@ -602,7 +562,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		ao_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 	}
 	if (roughness_img.is_valid()) {
-		if (!roughness_img->empty()) {
+		if (!roughness_img->is_empty()) {
 			if (roughness_img->is_compressed()) {
 				roughness_img->decompress();
 			}
@@ -610,7 +570,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		roughness_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 	}
 	if (metallic_img.is_valid()) {
-		if (!metallic_img->empty()) {
+		if (!metallic_img->is_empty()) {
 			if (metallic_img->is_compressed()) {
 				metallic_img->decompress();
 			}
@@ -618,7 +578,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		metallic_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 	}
 	if (normal_img.is_valid()) {
-		if (!normal_img->empty()) {
+		if (!normal_img->is_empty()) {
 			if (normal_img->is_compressed()) {
 				normal_img->decompress();
 			}
@@ -626,23 +586,21 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		normal_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 	}
 	if (emission_img.is_valid()) {
-		if (!emission_img->empty()) {
+		if (!emission_img->is_empty()) {
 			if (emission_img->is_compressed()) {
 				emission_img->decompress();
 			}
 		}
 		emission_img->resize(width, height, Image::INTERPOLATE_LANCZOS);
 	}
-	Ref<Image> img;
-	img.instance();
-	img->create(width, height, false, Image::FORMAT_RGBA8);
+	Ref<Image> img = Image::create_empty(width, height, false, Image::FORMAT_RGBA8);
 	Ref<Texture2D> tex;
 	if (texture_type == "orm") {
-		img->create(width, height, false, Image::FORMAT_RGB8);
+		tex = Image::create_empty(width, height, false, Image::FORMAT_RGB8);
 		for (int32_t y = 0; y < img->get_height(); y++) {
 			for (int32_t x = 0; x < img->get_width(); x++) {
 				Color orm;
-				if (ao_img.is_valid() && !ao_img->empty()) {
+				if (ao_img.is_valid() && !ao_img->is_empty()) {
 					if (material->get_ao_texture_channel() == BaseMaterial3D::TEXTURE_CHANNEL_RED) {
 						orm.r = ao_img->get_pixel(x, y).r;
 					} else if (material->get_ao_texture_channel() == BaseMaterial3D::TEXTURE_CHANNEL_GREEN) {
@@ -656,7 +614,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 					}
 				}
 				float channel_mul = 0.0f;
-				if (roughness_img.is_valid() && !roughness_img->empty()) {
+				if (roughness_img.is_valid() && !roughness_img->is_empty()) {
 					if (material->get_roughness_texture_channel() == BaseMaterial3D::TEXTURE_CHANNEL_RED) {
 						orm.g = roughness_img->get_pixel(x, y).r;
 					} else if (material->get_roughness_texture_channel() == BaseMaterial3D::TEXTURE_CHANNEL_GREEN) {
@@ -675,7 +633,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 				} else {
 					orm.g = material->get_roughness();
 				}
-				if (metallic_img.is_valid() && !metallic_img->empty()) {
+				if (metallic_img.is_valid() && !metallic_img->is_empty()) {
 					if (material->get_metallic_texture_channel() == BaseMaterial3D::TEXTURE_CHANNEL_RED) {
 						orm.b = metallic_img->get_pixel(x, y).r;
 					} else if (material->get_metallic_texture_channel() == BaseMaterial3D::TEXTURE_CHANNEL_GREEN) {
@@ -726,7 +684,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		}
 	} else if (texture_type == "emission") {
 		Color emission_col = material->get_emission();
-		float emission_energy = material->get_emission_energy();
+		float emission_energy = material->get_emission_energy_multiplier();
 		Color color_mul;
 		Color color_add;
 		if (material->get_emission_operator() == BaseMaterial3D::EMISSION_OP_ADD) {
@@ -738,7 +696,10 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, const
 		}
 		for (int32_t y = 0; y < img->get_height(); y++) {
 			for (int32_t x = 0; x < img->get_width(); x++) {
-				Color c = emission_img->get_pixel(x, y);
+				Color c;
+				if (emission_img.is_valid()) {
+					c = emission_img->get_pixel(x, y);
+				}
 				c.r = c.r * color_mul.r + color_add.r;
 				c.g = c.g * color_mul.g + color_add.g;
 				c.b = c.b * color_mul.b + color_add.b;
@@ -755,11 +716,17 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 	for (int32_t mesh_i = 0; mesh_i < r_meshes.size(); mesh_i++) {
 		for (int32_t j = 0; j < r_meshes[mesh_i].mesh->get_surface_count(); j++) {
 			Array mesh = r_meshes[mesh_i].mesh->surface_get_arrays(j);
-			if (mesh.empty()) {
+			if (mesh.is_empty()) {
+				xatlas::UvMeshDecl meshDecl;
+				xatlas::AddUvMesh(atlas, meshDecl);
+				mesh_count++;
 				continue;
 			}
 			Array indices = mesh[ArrayMesh::ARRAY_INDEX];
 			if (!indices.size()) {
+				xatlas::UvMeshDecl meshDecl;
+				xatlas::AddUvMesh(atlas, meshDecl);
+				mesh_count++;
 				continue;
 			}
 			xatlas::UvMeshDecl meshDecl;
@@ -793,7 +760,7 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 	pack_options.bilinear = true;
 	pack_options.padding = 16;
 	pack_options.texelsPerUnit = 0.0f;
-	pack_options.bruteForce = true;
+	pack_options.bruteForce = false;
 	pack_options.blockAlign = true;
 	pack_options.resolution = 2048;
 	xatlas::ComputeCharts(atlas);
@@ -811,11 +778,16 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 		for (int32_t surface_i = 0; surface_i < mesh_items[mesh_i].mesh->get_surface_count(); surface_i++) {
 			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
 			Array mesh = array_mesh->surface_get_arrays(surface_i);
-			if (mesh.empty()) {
+			Vector<ModelVertex> model_vertices;
+			if (mesh.is_empty()) {
+				mesh_count++;
+				r_model_vertices.write[mesh_count] = model_vertices;
 				continue;
 			}
 			Array vertices = mesh[ArrayMesh::ARRAY_VERTEX];
 			if (vertices.size() == 0) {
+				mesh_count++;
+				r_model_vertices.write[mesh_count] = model_vertices;
 				continue;
 			}
 			Vector<Vector3> vertex_arr = mesh[Mesh::ARRAY_VERTEX];
@@ -823,18 +795,16 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 			Vector<Vector2> uv_arr = mesh[Mesh::ARRAY_TEX_UV];
 			Vector<int32_t> index_arr = mesh[Mesh::ARRAY_INDEX];
 			Vector<Plane> tangent_arr = mesh[Mesh::ARRAY_TANGENT];
-			Transform xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();
-			Vector<ModelVertex> model_vertices;
+			Transform3D xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();
 			model_vertices.resize(vertex_arr.size());
 			for (int32_t vertex_i = 0; vertex_i < vertex_arr.size(); vertex_i++) {
 				ModelVertex vertex;
 				vertex.pos = xform.xform(vertex_arr[vertex_i]);
-				if (normal_arr.size()) {
-					Vector3 normal = normal_arr[vertex_i];
-					vertex.normal = xform.basis.xform(normal).normalized();
-				}
 				if (uv_arr.size()) {
 					vertex.uv = uv_arr[vertex_i];
+				}
+				if (normal_arr.size()) {
+					vertex.normal = normal_arr[vertex_i];
 				}
 				model_vertices.write[vertex_i] = vertex;
 			}
@@ -846,11 +816,15 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		for (int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
 			Array mesh = mesh_items[mesh_i].mesh->surface_get_arrays(j);
-			if (mesh.empty()) {
+			if (mesh.is_empty()) {
+				uv_groups.push_back(Vector<Vector2>());
+				mesh_count++;
 				continue;
 			}
 			Vector<Vector3> vertices = mesh[ArrayMesh::ARRAY_VERTEX];
 			if (vertices.size() == 0) {
+				mesh_count++;
+				uv_groups.push_back(Vector<Vector2>());
 				continue;
 			}
 			Vector<Vector2> uvs;
@@ -873,7 +847,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 				const Ref<Material> material = index_to_material.get(index);
 				if (material.is_null()) {
 					uvs.resize(0);
-					break;
+					continue;
 				}
 				Ref<BaseMaterial3D> Node3D_material = material;
 				if (Node3D_material.is_null()) {
@@ -882,8 +856,8 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 				const Ref<Texture2D> tex = Node3D_material->get_texture(BaseMaterial3D::TextureParam::TEXTURE_ALBEDO);
 				uvs.write[vertex_i] = r_model_vertices[mesh_count][vertex_i].uv;
 				if (tex.is_valid()) {
-					uvs.write[vertex_i].x *= (float)MAX(texture_minimum_side, tex->get_width());
-					uvs.write[vertex_i].y *= (float)MAX(texture_minimum_side, tex->get_height());
+					uvs.write[vertex_i].x *= tex->get_width();
+					uvs.write[vertex_i].y *= tex->get_height();
 				}
 			}
 			uv_groups.push_back(uvs);
@@ -899,7 +873,6 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 	int32_t width = target_image->get_size().x;
 	const int32_t bytes_in_pixel = 4;
 	pixels.resize(height * width * bytes_in_pixel);
-	;
 	for (int32_t y = 0; y < height; y++) {
 		for (int32_t x = 0; x < width; x++) {
 			int32_t pixel_index = x + (width * y);
@@ -931,20 +904,14 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
-		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
-			Array mesh = array_mesh->surface_get_arrays(j);
-			Array uvs = mesh[ArrayMesh::ARRAY_TEX_UV];
-			if (!uvs.size()) {
-				array_mesh->mesh_unwrap(Transform(), 2.0f);
-				break;
-			}
-		}
+		array_mesh->lightmap_unwrap(Transform3D(), 2.0f, true);
+
 		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
 			Array mesh = array_mesh->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
 			Ref<Material> mat = mesh_items[mesh_i].mesh->surface_get_material(j);
-			if (mesh_items[mesh_i].mesh_instance->get_surface_material(j).is_valid()) {
-				mat = mesh_items[mesh_i].mesh_instance->get_surface_material(j);
+			if (mesh_items[mesh_i].mesh_instance->get_active_material(j).is_valid()) {
+				mat = mesh_items[mesh_i].mesh_instance->get_active_material(j);
 			}
 			if (material_cache.find(mat) == -1) {
 				material_cache.push_back(mat);
@@ -967,24 +934,25 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	for (int32_t mesh_i = 0; mesh_i < state.r_mesh_items.size(); mesh_i++) {
 		if (state.r_mesh_items[mesh_i].mesh_instance->get_parent()) {
 			Node3D *node_3d = memnew(Node3D);
-			Transform xform = state.r_mesh_items[mesh_i].mesh_instance->get_transform();
+			Transform3D xform = state.r_mesh_items[mesh_i].mesh_instance->get_transform();
 			node_3d->set_transform(xform);
 			node_3d->set_name(state.r_mesh_items[mesh_i].mesh_instance->get_name());
 			state.r_mesh_items[mesh_i].mesh_instance->replace_by(node_3d);
 		}
 	}
 	Ref<SurfaceTool> st_all;
-	st_all.instance();
+	st_all.instantiate();
 	st_all->begin(Mesh::PRIMITIVE_TRIANGLES);
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
 		Ref<SurfaceTool> st;
-		st.instance();
+		st.instantiate();
 		st->begin(Mesh::PRIMITIVE_TRIANGLES);
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
 		for (uint32_t v = 0; v < mesh.vertexCount; v++) {
 			const xatlas::Vertex vertex = mesh.vertexArray[v];
 			const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
-			st->set_uv(Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height));
+			Vector2 uv = Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height);
+			st->set_uv(uv);
 			st->set_normal(sourceVertex.normal);
 			st->set_color(Color(1.0f, 1.0f, 1.0f));
 			st->add_vertex(sourceVertex.pos);
@@ -995,83 +963,71 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		}
 		st->generate_tangents();
 		Ref<ArrayMesh> array_mesh = st->commit();
-		st_all->append_from(array_mesh, 0, Transform());
+		st_all->append_from(array_mesh, 0, Transform3D());
 	}
-	Ref<StandardMaterial3D> mat;
-	mat.instance();
+	Ref<ORMMaterial3D> mat;
+	mat.instantiate();
 	mat->set_name("Atlas");
-	Map<String, Ref<Image> >::Element *A = state.texture_atlas.find("albedo");
+	HashMap<String, Ref<Image> >::Iterator A = state.texture_atlas.find("albedo");
 	Image::CompressMode compress_mode = Image::COMPRESS_ETC;
 	if (Image::_image_compress_bc_func) {
 		compress_mode = Image::COMPRESS_S3TC;
 	}
-	if (A && !A->get()->empty()) {
-		Ref<Image> img = dilate(A->get());
+	if (A && !A->key.is_empty()) {
+		Ref<Image> img = dilate(A->value);
 		img->compress(compress_mode, Image::COMPRESS_SOURCE_SRGB);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
-		path = base_dir.plus_file(path.get_basename().get_file() + "_albedo");
-		Ref<_Directory> directory;
-		directory.instance();
+		path = base_dir.path_to_file(path.get_basename().get_file() + "_albedo");
+		Ref<DirAccess> directory = DirAccess::create(DirAccess::AccessType::ACCESS_FILESYSTEM);
 		path += "_" + itos(p_count) + ".res";
-		Ref<ImageTexture> tex;
-		tex.instance();
-		tex->create_from_image(img);
-		ResourceSaver::save(path, tex);
-		RES res = ResourceLoader::load(path, "Texture2D", true);
+		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+		ResourceSaver::save(tex, path);
+		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, res);
 	}
-	Map<String, Ref<Image> >::Element *E = state.texture_atlas.find("emission");
-	if (E && !E->get()->empty()) {
-		Ref<Image> img = dilate(E->get());
+	HashMap<String, Ref<Image> >::Iterator E = state.texture_atlas.find("emission");
+	if (E && !E->key.is_empty()) {
+		Ref<Image> img = dilate(E->value);
 		img->compress(compress_mode);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
-		path = base_dir.plus_file(path.get_basename().get_file() + "_emission");
-		Ref<_Directory> directory;
-		directory.instance();
+		path = base_dir.path_join(path.get_basename().get_file() + "_emission");
+		Ref<DirAccess> directory = DirAccess::create(DirAccess::AccessType::ACCESS_FILESYSTEM);
 		path += "_" + itos(p_count) + ".res";
-		Ref<ImageTexture> tex;
-		tex.instance();
-		tex->create_from_image(img);
-		ResourceSaver::save(path, tex);
-		RES res = ResourceLoader::load(path, "Texture2D", true);
+		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+		ResourceSaver::save(tex, path);
+		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_feature(BaseMaterial3D::FEATURE_EMISSION, true);
 		mat->set_texture(BaseMaterial3D::TEXTURE_EMISSION, res);
 	}
-	Map<String, Ref<Image> >::Element *N = state.texture_atlas.find("normal");
-	if (N && !N->get()->empty()) {
-		Ref<Image> img = dilate(N->get());
+	HashMap<String, Ref<Image> >::Iterator N = state.texture_atlas.find("normal");
+	if (N && !N->key.is_empty()) {
+		Ref<Image> img = dilate(N->value);
 		img->compress(compress_mode, Image::COMPRESS_SOURCE_NORMAL);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
-		path = base_dir.plus_file(path.get_basename().get_file() + "_normal");
-		Ref<_Directory> directory;
-		directory.instance();
+		path = base_dir.path_join(path.get_basename().get_file() + "_normal");
+		Ref<DirAccess> directory = DirAccess::create(DirAccess::AccessType::ACCESS_FILESYSTEM);
 		path += "_" + itos(p_count) + ".res";
-		Ref<ImageTexture> tex;
-		tex.instance();
-		tex->create_from_image(img);
-		ResourceSaver::save(path, tex);
-		RES res = ResourceLoader::load(path, "Texture2D", true);
+		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+		ResourceSaver::save(tex, path);
+		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING, true);
 		mat->set_texture(BaseMaterial3D::TEXTURE_NORMAL, res);
 	}
-	Map<String, Ref<Image> >::Element *ORM = state.texture_atlas.find("orm");
-	if (ORM && !ORM->get()->empty()) {
-		Ref<Image> img = dilate(ORM->get());
+	HashMap<String, Ref<Image> >::Iterator ORM = state.texture_atlas.find("orm");
+	if (ORM && !ORM->key.is_empty()) {
+		Ref<Image> img = dilate(ORM->value);
 		img->compress(compress_mode);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
-		path = base_dir.plus_file(path.get_basename().get_file() + "_orm");
-		Ref<_Directory> directory;
-		directory.instance();
+		path = base_dir.path_join(path.get_basename().get_file() + "_orm");
+		Ref<DirAccess> directory = DirAccess::create(DirAccess::AccessType::ACCESS_FILESYSTEM);
 		path += "_" + itos(p_count) + ".res";
-		Ref<ImageTexture> tex;
-		tex.instance();
-		tex->create_from_image(img);
-		ResourceSaver::save(path, tex);
-		RES res = ResourceLoader::load(path, "Texture2D", true);
+		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+		ResourceSaver::save(tex, path);
+		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
 		mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
 		mat->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_RED);
 		mat->set_feature(BaseMaterial3D::FEATURE_AMBIENT_OCCLUSION, true);
@@ -1086,14 +1042,14 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	Ref<ArrayMesh> array_mesh = st_all->commit();
 	mi->set_mesh(array_mesh);
 	mi->set_name(state.p_name);
-	Transform root_xform;
+	Transform3D root_xform;
 	Node3D *node_3d = cast_to<Node3D>(state.p_root);
 	if (node_3d) {
 		root_xform = node_3d->get_transform();
 	}
 	mi->set_transform(root_xform.affine_inverse());
 	array_mesh->surface_set_material(0, mat);
-	state.p_root->add_child(mi);
+	state.p_root->add_child(mi, true);
 	if (mi != state.p_root) {
 		mi->set_owner(state.p_root);
 	}
@@ -1111,27 +1067,28 @@ void SceneMergePlugin::merge() {
 		file_export_lib->add_filter("*." + extensions[extension_i] + " ; " + extensions[extension_i].to_upper());
 	}
 	file_export_lib->popup_centered_ratio();
-	Node *root = editor->get_tree()->get_edited_scene_root();
-	String filename = String(root->get_filename().get_file().get_basename());
-	if (filename.empty()) {
+	Node *root = EditorNode::get_singleton()->get_tree()->get_edited_scene_root();
+	ERR_FAIL_NULL(root);
+	String filename = String(root->get_scene_file_path().get_file().get_basename());
+	if (filename.is_empty()) {
 		filename = root->get_name();
 	}
 	file_export_lib->set_current_file(filename + String(".scn"));
 }
 
 void SceneMergePlugin::_dialog_action(String p_file) {
-	Node *node = editor->get_tree()->get_edited_scene_root();
+	Node *node = EditorNode::get_singleton()->get_tree()->get_edited_scene_root();
 	if (!node) {
-		editor->show_accept(TTR("This operation can't be done without a scene."), TTR("OK"));
+		EditorNode::get_singleton()->show_accept(TTR("This operation can't be done without a scene."), TTR("OK"));
 		return;
 	}
 	if (FileAccess::exists(p_file) && file_export_lib_merge->is_pressed()) {
 		Ref<PackedScene> scene = ResourceLoader::load(p_file, "PackedScene");
 		if (scene.is_null()) {
-			editor->show_accept(TTR("Can't load scene for merging!"), TTR("OK"));
+			EditorNode::get_singleton()->show_accept(TTR("Can't load scene for merging!"), TTR("OK"));
 			return;
 		} else {
-			node->add_child(scene->instance());
+			node->add_child(scene->instantiate(), true);
 		}
 	}
 	scene_optimize->merge(p_file, node);
@@ -1143,22 +1100,17 @@ void SceneMergePlugin::_bind_methods() {
 }
 
 void SceneMergePlugin::_notification(int notification) {
-	if (notification == NOTIFICATION_ENTER_TREE) {
-		editor->add_tool_menu_item("Merge Scene", callable_mp(this, &SceneMergePlugin::merge));
-	} else if (notification == NOTIFICATION_EXIT_TREE) {
-		editor->remove_tool_menu_item("Merge Scene");
-	}
 }
 
-SceneMergePlugin::SceneMergePlugin(EditorNode *p_node) {
-	editor = p_node;
+SceneMergePlugin::SceneMergePlugin() {
 	file_export_lib->set_title(TTR("Export Library"));
 	file_export_lib->set_file_mode(EditorFileDialog::FILE_MODE_SAVE_FILE);
 	file_export_lib->connect("file_selected", callable_mp(this, &SceneMergePlugin::_dialog_action));
 	file_export_lib_merge->set_text(TTR("Merge With Existing"));
-	file_export_lib->get_vbox()->add_child(file_export_lib_merge);
-	editor->get_gui_base()->add_child(file_export_lib);
+	file_export_lib->get_vbox()->add_child(file_export_lib_merge, true);
+	EditorNode::get_singleton()->get_gui_base()->add_child(file_export_lib, true);
 	file_export_lib->set_title(TTR("Merge Scene"));
+	EditorNode::get_singleton()->add_tool_menu_item("Merge Scene", callable_mp(this, &SceneMergePlugin::merge));
 }
 #endif
 
@@ -1328,15 +1280,15 @@ bool MeshMergeMaterialRepack::Triangle::drawAA(SamplingCallback cb, void *param)
 	const float BK_OUTSIDE = -sqrtf(BK_SIZE * BK_SIZE / 2.0f);
 	float minx, miny, maxx, maxy;
 	// Bounding rectangle
-	minx = floorf(std::max(std::min(v1.x, std::min(v2.x, v3.x)), 0.0f));
-	miny = floorf(std::max(std::min(v1.y, std::min(v2.y, v3.y)), 0.0f));
-	maxx = ceilf(std::max(v1.x, std::max(v2.x, v3.x)));
-	maxy = ceilf(std::max(v1.y, std::max(v2.y, v3.y)));
+	minx = floorf(MAX(MIN(v1.x, MIN(v2.x, v3.x)), 0.0f));
+	miny = floorf(MAX(MIN(v1.y, MIN(v2.y, v3.y)), 0.0f));
+	maxx = ceilf(MAX(v1.x, MAX(v2.x, v3.x)));
+	maxy = ceilf(MAX(v1.y, MAX(v2.y, v3.y)));
 	// There's no reason to align the blocks to the viewport, instead we align them to the origin of the triangle bounds.
 	minx = floorf(minx);
 	miny = floorf(miny);
-	//minx = (float)(((int)minx) & (~((int)BK_SIZE - 1))); // align to blocksize (we don't need to worry about blocks partially out of viewport)
-	//miny = (float)(((int)miny) & (~((int)BK_SIZE - 1)));
+	// minx = (float)(((int)minx) & (~((int)BK_SIZE - 1))); // align to blocksize (we don't need to worry about blocks partially out of viewport)
+	// miny = (float)(((int)miny) & (~((int)BK_SIZE - 1)));
 	minx += 0.5;
 	miny += 0.5; // sampling at texel centers!
 	maxx += 0.5;
